@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - principal
       - master
   workflow_dispatch:
 
@@ -35,7 +36,8 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm ci || npm install
 
       - name: Build project
         run: npm run build

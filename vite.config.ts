@@ -4,8 +4,13 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(({ command }) => {
+  // Détection automatique du nom du dépôt sur GitHub Actions, avec repli sur le nom exact du dépôt
+  const repoName = process.env.GITHUB_REPOSITORY
+    ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
+    : '/Remix-Journal-de-Caisse-Calculateur-de-Gains/';
+
   return {
-    base: command === 'build' ? '/Remix-Journal-de-Caisse-Calculateur-de-Gains/' : '/',
+    base: command === 'build' ? repoName : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
