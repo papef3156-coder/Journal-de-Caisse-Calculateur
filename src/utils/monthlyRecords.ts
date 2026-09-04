@@ -26,6 +26,7 @@ export function calculateMonthlyProfitRecords(journals: DailyJournal[]): Monthly
     totalGrossRevenue: number;
     totalSoldUnits: number;
     totalReturnUnits: number;
+    totalReturnAmount: number;
     totalLostUnits: number;
     totalExpenses: number;
     daysCount: number;
@@ -54,16 +55,20 @@ export function calculateMonthlyProfitRecords(journals: DailyJournal[]): Monthly
         totalGrossRevenue: 0,
         totalSoldUnits: 0,
         totalReturnUnits: 0,
+        totalReturnAmount: 0,
         totalLostUnits: 0,
         totalExpenses: 0,
         daysCount: 0,
       };
     }
 
+    const returnAmt = j.summary?.returnPriceTotal || ((j.summary?.totalReturned || 0) * (j.unitReturnPrice || 0));
+
     map[monthKey].totalNetGain += (j.summary?.netGain || 0);
     map[monthKey].totalGrossRevenue += (j.summary?.grossRevenue || 0);
     map[monthKey].totalSoldUnits += (j.summary?.totalSold || 0);
     map[monthKey].totalReturnUnits += (j.summary?.totalReturned || 0);
+    map[monthKey].totalReturnAmount += returnAmt;
     map[monthKey].totalLostUnits += (j.summary?.totalLost || 0);
     map[monthKey].totalExpenses += (j.summary?.totalExpenses || 0);
     map[monthKey].daysCount += 1;
@@ -78,6 +83,7 @@ export function calculateMonthlyProfitRecords(journals: DailyJournal[]): Monthly
       totalGrossRevenue: 0,
       totalSoldUnits: 0,
       totalReturnUnits: 0,
+      totalReturnAmount: 0,
       totalLostUnits: 0,
       totalExpenses: 0,
       daysCount: 0,
@@ -107,6 +113,7 @@ export function calculateMonthlyProfitRecords(journals: DailyJournal[]): Monthly
       totalGrossRevenue: data.totalGrossRevenue,
       totalSoldUnits: data.totalSoldUnits,
       totalReturnUnits: data.totalReturnUnits,
+      totalReturnAmount: data.totalReturnAmount,
       totalLostUnits: data.totalLostUnits,
       totalExpenses: data.totalExpenses,
       daysCount: data.daysCount,

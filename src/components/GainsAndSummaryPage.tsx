@@ -283,7 +283,7 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
           <div className="flex items-center space-x-2">
             <BarChart3 className="w-5 h-5 text-[#2D5A43]" />
             <h3 className="text-lg font-bold font-editorial text-[#1A1A1A]">
-              3. Graphiques des Gains ({selectedPeriod === '7days' ? '7 Jours' : selectedPeriod === 'month' ? '1 Mois' : selectedPeriod === 'year' ? '1 An' : 'Période'})
+              3. Graphiques des Gains ({selectedPeriod === 'all' || selectedPeriod === 'today' ? 'Tous les Jours' : selectedPeriod === '7days' ? '7 Jours' : selectedPeriod === 'month' ? '1 Mois' : selectedPeriod === 'year' ? '1 An' : 'Tous les Jours'})
             </h3>
           </div>
 

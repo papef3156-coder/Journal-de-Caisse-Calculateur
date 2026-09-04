@@ -90,6 +90,7 @@ export interface MonthlyProfitRecord {
   totalGrossRevenue: number; // Chiffre d'Affaires cumulé du mois
   totalSoldUnits: number;  // Quantité totale vendue
   totalReturnUnits: number;// Quantité totale retournée
+  totalReturnAmount?: number; // Montant total des retours du mois
   totalLostUnits: number;  // Pertes / manquants totaux
   totalExpenses: number;   // Dépenses annexes totales du mois
   daysCount: number;       // Nombre de journaux de caisse enregistrés

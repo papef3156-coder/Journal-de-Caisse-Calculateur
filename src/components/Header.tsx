@@ -4,17 +4,13 @@ import {
   Calculator, 
   Settings as SettingsIcon, 
   Store, 
-  Calendar, 
   PlusCircle, 
   Sparkles,
   ReceiptText,
   TrendingUp,
   BookOpen,
-  Clock,
-  RefreshCw,
   ExternalLink
 } from 'lucide-react';
-import { useLiveDateTime } from '../utils/dateTime';
 import { MicrosoftAuthButton } from './MicrosoftAuthButton';
 import { User } from 'firebase/auth';
 import { DailyJournal } from '../types';
@@ -40,8 +36,6 @@ export const Header: React.FC<HeaderProps> = ({
   journals,
   onJournalsLoadedFromCloud
 }) => {
-  const { formattedDateLong, timeStr, refreshNow } = useLiveDateTime();
-
   return (
     <header className="bg-[#FAFAF7] border-b border-[#DCD6CB] sticky top-0 z-30 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -75,38 +69,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <h1 className="text-xl sm:text-2xl font-bold font-editorial text-[#1A1A1A] tracking-tight group-hover:text-[#2D5A43] transition-colors">
                     {settings.businessName || 'Journal de Caisse'}
                   </h1>
-                </button>
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#EBE8E0] text-[#2D5A43] border border-[#DCD6CB]">
-                  {settings.currency}
-                </span>
-              </div>
-              
-              {/* Live Auto-Updating Date and Clock Indicator */}
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <button 
-                  type="button"
-                  onClick={() => setActivePage('settings')}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E7EFEA] hover:bg-[#D7E8DD] border border-[#C3D9CD] hover:border-[#2D5A43]/40 text-[11px] sm:text-xs font-medium text-[#2D5A43] transition-all cursor-pointer shadow-2xs"
-                  title="Date et heure synchronisées en temps réel — Cliquer pour ouvrir les Paramètres"
-                >
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2D5A43] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2D5A43]"></span>
-                  </span>
-                  <Calendar className="w-3 h-3 text-[#2D5A43]" />
-                  <span className="capitalize font-semibold">{formattedDateLong}</span>
-                  <span className="text-[#8C877E]">•</span>
-                  <Clock className="w-3 h-3 text-[#2D5A43]" />
-                  <span className="font-mono text-[#1B3628] font-bold tracking-wide">{timeStr}</span>
-                </button>
-
-                <button
-                  id="btn-refresh-datetime"
-                  onClick={refreshNow}
-                  title="Actualiser la date et l'heure manuellement"
-                  className="hidden md:inline-flex p-1 rounded-md text-[#7A756D] hover:text-[#2D5A43] hover:bg-[#EBE8E0] transition-colors"
-                >
-                  <RefreshCw className="w-3 h-3" />
                 </button>
               </div>
             </div>

@@ -23,9 +23,7 @@ import {
   BarChart3,
   CheckCircle2,
   Calendar,
-  RotateCw,
   Clock,
-  Sparkles,
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
@@ -45,37 +43,18 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
   selectedPeriod,
   currentUserId,
 }) => {
-  // Chart granularity: 'monthly' (tous les 1 mois) vs 'daily' (par jour)
-  // Default to monthly view to fulfill automatic monthly recording & visualization
-  const [chartViewMode, setChartViewMode] = useState<'monthly' | 'daily'>('monthly');
+  // Chart granularity: 'daily' (Tous les Jours) vs 'monthly' (Tous les 1 mois)
+  // Defaults to daily view to show day-by-day profits as requested
+  const [chartViewMode, setChartViewMode] = useState<'daily' | 'monthly'>('daily');
   const [monthlyRecords, setMonthlyRecords] = useState<MonthlyProfitRecord[]>([]);
-  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
-  const [isManuallySaving, setIsManuallySaving] = useState<boolean>(false);
-  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [showMonthlyHistoryTable, setShowMonthlyHistoryTable] = useState<boolean>(true);
 
-  // Automatically consolidate and save monthly records whenever journals change
+  // Automatically consolidate and save monthly records in background whenever journals change
   useEffect(() => {
     autoSaveMonthlyProfitRecords(journals, currentUserId).then((records) => {
       setMonthlyRecords(records);
-      const now = new Date();
-      setLastAutoSaveTime(
-        `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
-      );
     });
   }, [journals, currentUserId]);
-
-  const handleForceAutoSave = async () => {
-    setIsManuallySaving(true);
-    const updated = await autoSaveMonthlyProfitRecords(journals, currentUserId);
-    setMonthlyRecords(updated);
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    setLastAutoSaveTime(timeStr);
-    setIsManuallySaving(false);
-    setSaveFeedback(`✓ Bilan mensuel consolidé et enregistré automatiquement avec succès (${timeStr})`);
-    setTimeout(() => setSaveFeedback(null), 4000);
-  };
 
   // Daily sorted data
   const dailyChartData = useMemo(() => {
@@ -105,12 +84,14 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
           shortDate = `${parts[2]}/${parts[1]}`;
         }
       }
+      const returnAmt = j.summary?.returnPriceTotal || ((j.summary?.totalReturned || 0) * (j.unitReturnPrice || 0));
       return {
         date: j.date,
         label: shortDate,
         fullLabel: formatDateFrench(j.date),
         gain: j.summary?.netGain ?? 0,
         revenue: j.summary?.grossRevenue ?? 0,
+        returnAmount: returnAmt,
         soldUnits: j.summary?.totalSold ?? 0,
         returnUnits: j.summary?.totalReturned ?? 0,
         lostUnits: j.summary?.totalLost ?? 0,
@@ -126,12 +107,14 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
     const records = monthlyRecords.length > 0 ? monthlyRecords : calculateMonthlyProfitRecords(journals);
     return records.map((rec) => {
       const shortMonth = `${MONTH_SHORT_NAMES_FR[rec.monthIndex]} ${rec.year}`;
+      const returnAmt = rec.totalReturnAmount ?? ((rec.totalReturnUnits || 0) * 50);
       return {
         date: rec.monthKey,
         label: shortMonth,
         fullLabel: rec.monthLabel,
         gain: rec.totalNetGain,
         revenue: rec.totalGrossRevenue,
+        returnAmount: returnAmt,
         soldUnits: rec.totalSoldUnits,
         returnUnits: rec.totalReturnUnits,
         lostUnits: rec.totalLostUnits,
@@ -150,53 +133,6 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
   return (
     <div className="space-y-6" id="analytics-section">
       
-      {/* BANDEAU D'ENREGISTREMENT AUTOMATIQUE MENSUEL */}
-      <div className="bg-[#F4F1EA] border border-[#DCD6CB] rounded-2xl p-4 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#E7EFEA] border border-[#C3D9CD] flex items-center justify-center text-[#2D5A43] shrink-0">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-bold text-sm text-[#1A1A1A] font-editorial">
-                  Enregistrement Automatique Mensuel Actif (Tous les 1 mois)
-                </h4>
-                <span className="text-[11px] font-semibold bg-[#E7EFEA] text-[#2D5A43] px-2 py-0.5 rounded-md border border-[#C3D9CD]">
-                  Auto-Sauvegarde Active
-                </span>
-              </div>
-              <p className="text-xs text-[#5C574F] font-editorial mt-0.5">
-                Chaque mois de vente est consolidé, cumulé et archivé automatiquement dans l'historique et le Cloud sans perte de données.
-                {lastAutoSaveTime && (
-                  <span className="ml-1 text-[#7A756D] italic">
-                    (Dernière synchro auto à {lastAutoSaveTime})
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleForceAutoSave}
-              disabled={isManuallySaving}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#DCD6CB] bg-[#FAFAF7] hover:bg-[#EBE8E0] text-[#1A1A1A] transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Actualiser et forcer l'enregistrement du bilan mensuel"
-            >
-              <RotateCw className={`w-3.5 h-3.5 text-[#5C574F] ${isManuallySaving ? 'animate-spin' : ''}`} />
-              <span>{isManuallySaving ? 'Enregistrement...' : 'Enregistrer le mois'}</span>
-            </button>
-          </div>
-        </div>
-
-        {saveFeedback && (
-          <div className="mt-2.5 text-xs text-[#2D5A43] bg-[#E7EFEA] px-3 py-1.5 rounded-lg font-medium border border-[#C3D9CD] animate-fadeIn">
-            {saveFeedback}
-          </div>
-        )}
-      </div>
-
       {/* CHARTS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
@@ -206,21 +142,33 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
             <div>
               <h3 className="font-bold text-[#1A1A1A] font-editorial text-lg flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-[#2D5A43]" />
-                <span>Évolution des Bénéfices & Revenus</span>
+                <span>Graphiques des Gains (Tous les Jours)</span>
               </h3>
               <p className="text-xs text-[#7A756D] font-editorial italic">
-                {chartViewMode === 'monthly'
-                  ? `Consolidation automatique enregistrée tous les 1 mois en ${currency}`
-                  : `Détail journalier enregistré en ${currency}`}
+                {chartViewMode === 'daily'
+                  ? `Évolution continue des bénéfices journaliers, du chiffre d’affaires et des retours en ${currency}`
+                  : `Consolidation automatique enregistrée tous les 1 mois en ${currency}`}
               </p>
             </div>
 
-            {/* TOGGLE MENSUEL (TOUS LES 1 MOIS) VS JOURNALIER */}
+            {/* TOGGLE TOUS LES JOURS VS TOUS LES 1 MOIS */}
             <div className="inline-flex bg-[#EBE8E0] p-1 rounded-xl border border-[#DCD6CB] text-xs font-semibold">
+              <button
+                id="btn-view-mode-daily"
+                onClick={() => setChartViewMode('daily')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  chartViewMode === 'daily'
+                    ? 'bg-[#2D5A43] text-white shadow-xs'
+                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Tous les Jours</span>
+              </button>
               <button
                 id="btn-view-mode-monthly"
                 onClick={() => setChartViewMode('monthly')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
                   chartViewMode === 'monthly'
                     ? 'bg-[#2D5A43] text-white shadow-xs'
                     : 'text-[#5C574F] hover:text-[#1A1A1A]'
@@ -228,18 +176,6 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
               >
                 <Calendar className="w-3.5 h-3.5" />
                 <span>Tous les 1 mois</span>
-              </button>
-              <button
-                id="btn-view-mode-daily"
-                onClick={() => setChartViewMode('daily')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
-                  chartViewMode === 'daily'
-                    ? 'bg-[#2D5A43] text-white shadow-xs'
-                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
-                }`}
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>Par jour</span>
               </button>
             </div>
           </div>
@@ -256,17 +192,38 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
                     <stop offset="5%" stopColor="#7A756D" stopOpacity={0.2} />
                     <stop offset="95%" stopColor="#7A756D" stopOpacity={0.0} />
                   </linearGradient>
+                  <linearGradient id="returnGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#B45309" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#B45309" stopOpacity={0.0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#EBE8E0" />
                 <XAxis dataKey="label" stroke="#8C877E" fontSize={11} tickLine={false} />
                 <YAxis stroke="#8C877E" fontSize={11} tickLine={false} tickFormatter={(val) => `${Math.round(val / 1000)}k`} />
                 <Tooltip
-                  formatter={(val: any, name: string) => [
-                    formatCurrency(Number(val), currency),
-                    name === 'gain'
-                      ? chartViewMode === 'monthly' ? 'Bénéfice Net Mensuel' : 'Gain Net Journalier'
-                      : chartViewMode === 'monthly' ? 'Chiffre d’affaires Mensuel' : 'Chiffre d’affaires',
-                  ]}
+                  formatter={(val: any, name: string, item: any) => {
+                    const num = Number(val) || 0;
+                    if (name === 'gain') {
+                      return [
+                        formatCurrency(num, currency),
+                        chartViewMode === 'monthly' ? 'Bénéfice Net Mensuel' : 'Bénéfice Net Journalier'
+                      ];
+                    }
+                    if (name === 'revenue') {
+                      return [
+                        formatCurrency(num, currency),
+                        chartViewMode === 'monthly' ? 'Chiffre d’affaires Mensuel' : 'Chiffre d’affaires Journalier'
+                      ];
+                    }
+                    if (name === 'returnAmount') {
+                      const units = item?.payload?.returnUnits ?? 0;
+                      return [
+                        `${formatCurrency(num, currency)} (${units} retour${units > 1 ? 's' : ''})`,
+                        chartViewMode === 'monthly' ? 'Retours Mensuels' : 'Retours Journaliers'
+                      ];
+                    }
+                    return [formatCurrency(num, currency), name];
+                  }}
                   labelFormatter={(_lbl, payload) => {
                     if (payload && payload[0]) {
                       const p = payload[0].payload;
@@ -281,18 +238,23 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
                 />
                 <Area type="monotone" dataKey="revenue" stroke="#7A756D" strokeWidth={2} fillOpacity={1} fill="url(#revGradient)" name="revenue" />
                 <Area type="monotone" dataKey="gain" stroke="#2D5A43" strokeWidth={3} fillOpacity={1} fill="url(#gainGradient)" name="gain" />
+                <Area type="monotone" dataKey="returnAmount" stroke="#B45309" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#returnGradient)" name="returnAmount" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-xs text-[#7A756D] border-t border-[#EBE8E0] pt-2 font-editorial">
+          <div className="mt-3 flex flex-wrap items-center justify-between text-xs text-[#7A756D] border-t border-[#EBE8E0] pt-2 font-editorial gap-2">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#2D5A43]"></span>
-              <span>Ligne verte : Bénéfice net ({chartViewMode === 'monthly' ? 'cumul par mois' : 'par jour'})</span>
+              <span>Ligne verte : Bénéfice net ({chartViewMode === 'monthly' ? 'cumul par mois' : 'tous les jours'})</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#7A756D]"></span>
               <span>Ligne grise : Chiffre d’affaires</span>
+            </span>
+            <span className="flex items-center gap-1.5 font-medium text-[#92400E]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#B45309]"></span>
+              <span>Ligne ambrée : Retours ({chartViewMode === 'monthly' ? 'mois' : 'tous les jours'})</span>
             </span>
           </div>
         </div>
@@ -308,7 +270,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
               <p className="text-xs text-[#7A756D] font-editorial italic">
                 {chartViewMode === 'monthly'
                   ? 'Quantités totales enregistrées tous les 1 mois'
-                  : 'Quantités journalières écoulées et retours'}
+                  : 'Quantités enregistrées tous les jours'}
               </p>
             </div>
           </div>

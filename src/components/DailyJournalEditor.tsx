@@ -797,7 +797,7 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
       {/* 3. SELLERS ACCOUNTING TABLE (TABLEAU COMPTABILITÉ DU CAHIER) */}
       <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] shadow-xs overflow-hidden">
         
-        <div className="p-4 sm:p-5 border-b border-[#DCD6CB] flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-[#EBE8E0]/70">
+        <div className="p-4 sm:p-5 border-b border-[#DCD6CB] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#EBE8E0]/70">
           <div>
             <div className="flex items-center space-x-2">
               <UserPlus className="w-5 h-5 text-[#2D5A43]" />
@@ -806,69 +806,8 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
               </h3>
             </div>
             <p className="text-xs text-[#7A756D] font-editorial italic mt-0.5">
-              {sellerAutoCalcMode === 'return_from_sold' 
-                ? 'Calcul automatique actif : le retour est calculé instantanément (Total Confié - Vente).'
-                : 'Saisissez vos quantités : les calculs de caisse sont mis à jour en direct.'}
+              Saisissez vos quantités : les calculs de caisse sont mis à jour en direct.
             </p>
-          </div>
-
-          {/* Mode Switcher & Quick Actions */}
-          <div className="flex flex-wrap items-center gap-2">
-            
-            {/* Calculation Mode Selector */}
-            <div className="flex items-center bg-[#FAFAF7] border border-[#DCD6CB] rounded-lg p-0.5 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => {
-                  setSellerAutoCalcMode('return_from_sold');
-                  handleRecalculateAllReturns();
-                }}
-                className={`px-2.5 py-1 rounded-md transition-all ${
-                  sellerAutoCalcMode === 'return_from_sold'
-                    ? 'bg-[#2D5A43] text-white shadow-xs'
-                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
-                }`}
-                title="Calculer automatiquement les retours : Confié - Vente = Retour"
-              >
-                ⚡ Confié - Vente = Retour
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSellerAutoCalcMode('sold_from_return');
-                  handleRecalculateAllSales();
-                }}
-                className={`px-2.5 py-1 rounded-md transition-all ${
-                  sellerAutoCalcMode === 'sold_from_return'
-                    ? 'bg-[#2D5A43] text-white shadow-xs'
-                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
-                }`}
-                title="Calculer automatiquement les ventes : Confié - Retour = Vente"
-              >
-                ⚡ Confié - Retour = Vente
-              </button>
-              <button
-                type="button"
-                onClick={() => setSellerAutoCalcMode('manual')}
-                className={`px-2.5 py-1 rounded-md transition-all ${
-                  sellerAutoCalcMode === 'manual'
-                    ? 'bg-[#2D5A43] text-white shadow-xs'
-                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
-                }`}
-                title="Saisie manuelle des retours et ventes"
-              >
-                ✍️ Manuel
-              </button>
-            </div>
-
-            <button
-              id="btn-add-default-sellers"
-              onClick={handlePopulateDefaultSellers}
-              className="text-xs font-semibold text-[#4A463F] bg-[#FAFAF7] hover:bg-[#EBE8E0] border border-[#DCD6CB] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-[#7A756D]" />
-              <span className="hidden sm:inline">Charger vendeurs</span>
-            </button>
           </div>
         </div>
 
