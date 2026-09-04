@@ -118,6 +118,42 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
     setShowExpenses((currentJournal.expenses || []).length > 0);
   }, [currentJournal.id, currentJournal.updatedAt]);
 
+  // Automatically sync newly added sellers from settings (Identification de l'Équipe) directly into Comptabilité des Vendeurs / Livreurs
+  useEffect(() => {
+    if (!settings?.defaultSellers?.length) return;
+
+    setSellers((prevSellers) => {
+      const existingNames = new Set(prevSellers.map((s) => s.name.trim().toLowerCase()));
+      const toAdd: SellerEntry[] = [];
+
+      settings.defaultSellers.forEach((item, index) => {
+        const sName = typeof item === 'string' ? item.trim() : item.name.trim();
+        if (sName && !existingNames.has(sName.toLowerCase())) {
+          existingNames.add(sName.toLowerCase());
+          const phone = typeof item === 'object' && item.phone ? item.phone : '+221 77 000 00 00';
+          const age = typeof item === 'object' && item.age ? item.age : 25;
+          const role = typeof item === 'object' && item.role ? item.role : 'Vendeur';
+
+          toAdd.push({
+            id: `sel-auto-${Date.now()}-${index}`,
+            name: sName,
+            phone,
+            age,
+            role,
+            totalGiven: 0,
+            soldCount: 0,
+            returnCount: 0,
+            lostCount: 0,
+            cashCollected: 0,
+          });
+        }
+      });
+
+      if (toAdd.length === 0) return prevSellers;
+      return [...prevSellers, ...toAdd];
+    });
+  }, [settings.defaultSellers]);
+
   // Live calculation of summary
   const summary = calculateJournalSummary(
     sellers,
@@ -650,16 +686,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
               <Printer className="w-4 h-4 text-[#5C574F]" />
               <span>Imprimer / Ticket</span>
             </button>
-
-            <button
-              id="btn-reset-journal"
-              onClick={onNewJournal}
-              title="Créer un nouveau journal vierge"
-              className="flex items-center space-x-1.5 bg-[#FAFAF7] hover:bg-[#EBE8E0] text-[#5C574F] px-3 py-2.5 rounded-xl font-medium text-sm transition-colors border border-[#DCD6CB] cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nouveau</span>
-            </button>
           </div>
         </div>
 
@@ -842,15 +868,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
             >
               <RotateCcw className="w-3.5 h-3.5 text-[#7A756D]" />
               <span className="hidden sm:inline">Charger vendeurs</span>
-            </button>
-
-            <button
-              id="btn-add-seller-row"
-              onClick={() => handleAddSeller()}
-              className="text-xs font-semibold text-white bg-[#2D5A43] hover:bg-[#234735] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Ajouter vendeur</span>
             </button>
           </div>
         </div>

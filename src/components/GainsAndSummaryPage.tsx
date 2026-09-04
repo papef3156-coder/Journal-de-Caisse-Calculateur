@@ -34,6 +34,7 @@ interface GainsAndSummaryPageProps {
   currentJournal: DailyJournal;
   settings: AppSettings;
   selectedPeriod: TimePeriod;
+  currentUserId?: string;
   onSelectPeriod: (period: TimePeriod) => void;
   onSelectJournal: (journal: DailyJournal) => void;
   onUpdateSellerInfo?: (sellerName: string, updatedInfo: { phone?: string; age?: number | string; role?: string }) => void;
@@ -44,6 +45,7 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
   currentJournal,
   settings,
   selectedPeriod,
+  currentUserId,
   onSelectPeriod,
   onSelectJournal,
   onUpdateSellerInfo,
@@ -289,6 +291,7 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
             journals={journals}
             currency={settings.currency}
             selectedPeriod={selectedPeriod}
+            currentUserId={currentUserId}
             onUpdateSellerInfo={onUpdateSellerInfo}
           />
         </div>

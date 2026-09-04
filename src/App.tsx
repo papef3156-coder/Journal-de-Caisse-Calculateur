@@ -18,6 +18,7 @@ import { JournalHistoryList } from './components/JournalHistoryList';
 import { GainsAndSummaryPage } from './components/GainsAndSummaryPage';
 import { SettingsPage } from './components/SettingsPage';
 import { ReceiptModal } from './components/ReceiptModal';
+import { autoSaveMonthlyProfitRecords } from './utils/monthlyRecords';
 import { auth, saveJournalToCloud, saveSettingsToCloud, deleteJournalFromCloud, loadJournalsFromCloud } from './utils/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { 
@@ -27,7 +28,6 @@ import {
   PlusCircle, 
   CalendarDays,
   Sparkles,
-  Store,
   TrendingUp
 } from 'lucide-react';
 
@@ -82,6 +82,31 @@ export default function App() {
       sellersToUse = getInitialSellers();
     }
 
+    // Also ensure all sellers currently registered in settings.defaultSellers are included
+    const existingSellerNames = new Set(sellersToUse.map((s) => s.name.trim().toLowerCase()));
+    settings.defaultSellers.forEach((item, idx) => {
+      const sName = typeof item === 'string' ? item.trim() : item.name.trim();
+      if (sName && !existingSellerNames.has(sName.toLowerCase())) {
+        existingSellerNames.add(sName.toLowerCase());
+        const phone = typeof item === 'object' && item.phone ? item.phone : '+221 77 000 00 00';
+        const age = typeof item === 'object' && item.age ? item.age : 25;
+        const role = typeof item === 'object' && item.role ? item.role : 'Vendeur';
+        sellersToUse.push({
+          id: `sel-${dateStr}-def-${idx}-${Date.now()}`,
+          name: sName,
+          phone,
+          age,
+          role,
+          totalGiven: 0,
+          soldCount: 0,
+          returnCount: 0,
+          lostCount: 0,
+          cashCollected: 0,
+          notes: '',
+        });
+      }
+    });
+
     const summary = calculateJournalSummary(
       sellersToUse,
       settings.defaultSellingPrice,
@@ -132,10 +157,13 @@ export default function App() {
     }
   }, [liveTodayStr, journals.length]);
 
-  // Keep localStorage in sync
+  // Keep localStorage in sync and auto-save monthly profit records every 1 month
   useEffect(() => {
     saveJournals(journals);
-  }, [journals]);
+    if (journals.length > 0) {
+      autoSaveMonthlyProfitRecords(journals, currentUser?.uid).catch(console.error);
+    }
+  }, [journals, currentUser?.uid]);
 
   useEffect(() => {
     saveSettings(settings);
@@ -303,6 +331,76 @@ export default function App() {
     });
   };
 
+  // Handle saving settings and automatically propagate new sellers to current journal and seller accounting
+  const handleSaveSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+
+    // Automatically synchronize new sellers from Identification de l'Équipe into currentJournal
+    setCurrentJournal((prevJournal) => {
+      const existingNames = new Set(prevJournal.sellers.map((s) => s.name.trim().toLowerCase()));
+      const newEntries: SellerEntry[] = [];
+
+      newSettings.defaultSellers.forEach((item, idx) => {
+        const sName = typeof item === 'string' ? item.trim() : item.name.trim();
+        if (sName && !existingNames.has(sName.toLowerCase())) {
+          existingNames.add(sName.toLowerCase());
+          const phone = typeof item === 'object' && item.phone ? item.phone : '+221 77 000 00 00';
+          const age = typeof item === 'object' && item.age ? item.age : 25;
+          const role = typeof item === 'object' && item.role ? item.role : 'Vendeur';
+
+          newEntries.push({
+            id: `sel-auto-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+            name: sName,
+            phone,
+            age,
+            role,
+            totalGiven: 0,
+            soldCount: 0,
+            returnCount: 0,
+            lostCount: 0,
+            cashCollected: 0,
+            notes: '',
+          });
+        }
+      });
+
+      if (newEntries.length === 0) return prevJournal;
+
+      const updatedSellers = [...prevJournal.sellers, ...newEntries];
+      const updatedSummary = calculateJournalSummary(
+        updatedSellers,
+        prevJournal.unitSellingPrice,
+        prevJournal.unitReturnPrice,
+        prevJournal.unitCostPrice,
+        prevJournal.expenses,
+        newSettings.calculationFormula
+      );
+
+      const updatedJournal: DailyJournal = {
+        ...prevJournal,
+        sellers: updatedSellers,
+        summary: updatedSummary,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Also update in journals list
+      setJournals((prev) => {
+        return prev.map((j) => {
+          if (j.id === updatedJournal.id || j.date === updatedJournal.date) {
+            return updatedJournal;
+          }
+          return j;
+        });
+      });
+
+      if (currentUser) {
+        saveJournalToCloud(currentUser.uid, updatedJournal).catch(console.error);
+      }
+
+      return updatedJournal;
+    });
+  };
+
   const handleResetAllData = () => {
     localStorage.clear();
     const loadedS = DEFAULT_SETTINGS;
@@ -378,7 +476,7 @@ export default function App() {
                 onSaveJournal={handleSaveJournal}
                 onPrintJournal={(j) => setActivePrintJournal(j)}
                 onNewJournal={handleNewJournal}
-                onUpdateSettings={setSettings}
+                onUpdateSettings={handleSaveSettings}
               />
             </section>
 
@@ -417,6 +515,7 @@ export default function App() {
             currentJournal={currentJournal}
             settings={settings}
             selectedPeriod={selectedPeriod}
+            currentUserId={currentUser?.uid}
             onSelectPeriod={setSelectedPeriod}
             onUpdateSellerInfo={handleUpdateSellerInfo}
             onSelectJournal={(j) => {
@@ -431,7 +530,7 @@ export default function App() {
           <div className="animate-fadeIn">
             <SettingsPage
               settings={settings}
-              onSaveSettings={(newSettings) => setSettings(newSettings)}
+              onSaveSettings={handleSaveSettings}
               journals={journals}
               onImportJournals={(imported) => {
                 setJournals(imported);

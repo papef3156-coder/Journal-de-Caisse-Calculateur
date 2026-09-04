@@ -47,16 +47,35 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           
-          {/* Brand & Store Name */}
+          {/* Brand Logo & Store Name */}
           <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#2D5A43] flex items-center justify-center text-[#F4F1EA] shadow-sm">
-              <Store className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
+            <button
+              type="button"
+              onClick={() => setActivePage('journal')}
+              className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden shadow-xs border border-[#2D5A43]/20 bg-[#1B382B] flex items-center justify-center shrink-0 transition-transform hover:scale-105 cursor-pointer group"
+              title="Journal de Caisse & Calculateur de Gains - Revenir au Journal"
+            >
+              <img
+                src="/logo.jpg"
+                alt="Logo Journal de Caisse & Calculateur de Gains"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src = '/favicon.svg';
+                }}
+              />
+            </button>
             <div>
               <div className="flex items-center space-x-2.5">
-                <h1 className="text-xl sm:text-2xl font-bold font-editorial text-[#1A1A1A] tracking-tight">
-                  {settings.businessName || 'Journal de Caisse'}
-                </h1>
+                <button
+                  type="button"
+                  onClick={() => setActivePage('journal')}
+                  className="text-left cursor-pointer group"
+                >
+                  <h1 className="text-xl sm:text-2xl font-bold font-editorial text-[#1A1A1A] tracking-tight group-hover:text-[#2D5A43] transition-colors">
+                    {settings.businessName || 'Journal de Caisse'}
+                  </h1>
+                </button>
                 <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#EBE8E0] text-[#2D5A43] border border-[#DCD6CB]">
                   {settings.currency}
                 </span>

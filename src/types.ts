@@ -79,3 +79,22 @@ export interface AppSettings {
 
 export type ActivePage = 'journal' | 'gains_summary' | 'settings' | 'dashboard';
 export type TimePeriod = 'today' | '7days' | 'month' | 'year' | 'all';
+
+export interface MonthlyProfitRecord {
+  id: string;              // ex: "month-2026-09"
+  monthKey: string;        // ex: "2026-09"
+  monthLabel: string;      // ex: "Septembre 2026"
+  year: number;
+  monthIndex: number;      // 0 = Janvier, 11 = Décembre
+  totalNetGain: number;    // Bénéfice Net cumulé du mois
+  totalGrossRevenue: number; // Chiffre d'Affaires cumulé du mois
+  totalSoldUnits: number;  // Quantité totale vendue
+  totalReturnUnits: number;// Quantité totale retournée
+  totalLostUnits: number;  // Pertes / manquants totaux
+  totalExpenses: number;   // Dépenses annexes totales du mois
+  daysCount: number;       // Nombre de journaux de caisse enregistrés
+  averageDailyGain: number;// Bénéfice moyen par jour enregistré
+  lastAutoSaved: string;   // Horodatage ISO du dernier enregistrement automatique
+  status: 'en_cours' | 'cloture_auto';
+}
+

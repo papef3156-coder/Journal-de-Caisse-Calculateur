@@ -69,6 +69,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [newSellerAge, setNewSellerAge] = useState<number | string>('');
   const [newSellerRole, setNewSellerRole] = useState('Vendeur');
   const [showAddSellerForm, setShowAddSellerForm] = useState(false);
+  const [sellerSyncNotice, setSellerSyncNotice] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [justSyncedTime, setJustSyncedTime] = useState(false);
@@ -178,10 +179,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       return;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      defaultSellers: [...prev.defaultSellers, newProfile],
-    }));
+    const updatedDefaultSellers = [...formData.defaultSellers, newProfile];
+    const updatedSettings: AppSettings = {
+      ...formData,
+      defaultSellers: updatedDefaultSellers,
+    };
+
+    setFormData(updatedSettings);
+    // Automatically save and synchronize to "Comptabilité des Vendeurs / Livreurs"
+    onSaveSettings(updatedSettings);
+
+    setSellerSyncNotice(`✓ Le vendeur « ${newProfile.name} » (${newProfile.role}) a été ajouté à l'équipe et intégré automatiquement dans la Comptabilité des Vendeurs / Livreurs !`);
+    setTimeout(() => setSellerSyncNotice(null), 6000);
 
     setNewSellerName('');
     setNewSellerPhone('');
@@ -191,13 +200,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleRemoveDefaultSeller = (sellerName: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      defaultSellers: prev.defaultSellers.filter((s) => {
-        const name = typeof s === 'string' ? s : s.name;
-        return name !== sellerName;
-      }),
-    }));
+    const updatedDefaultSellers = formData.defaultSellers.filter((s) => {
+      const name = typeof s === 'string' ? s : s.name;
+      return name !== sellerName;
+    });
+
+    const updatedSettings: AppSettings = {
+      ...formData,
+      defaultSellers: updatedDefaultSellers,
+    };
+
+    setFormData(updatedSettings);
+    onSaveSettings(updatedSettings);
   };
 
   const handleStartEditSeller = (sellerItem: string | SellerInfo) => {
@@ -286,11 +300,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         
         {/* 1. Informations de l'Établissement & Nom */}
         <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-5 shadow-xs space-y-4">
-          <div className="flex items-center space-x-2 border-b border-[#EBE8E0] pb-3">
-            <Store className="w-5 h-5 text-[#2D5A43]" />
-            <h3 className="font-bold text-[#1A1A1A] font-editorial text-base">
-              Informations du Commerce
-            </h3>
+          <div className="flex items-center justify-between border-b border-[#EBE8E0] pb-3">
+            <div className="flex items-center space-x-2">
+              <Store className="w-5 h-5 text-[#2D5A43]" />
+              <h3 className="font-bold text-[#1A1A1A] font-editorial text-base">
+                Informations du Commerce
+              </h3>
+            </div>
+            {/* Logo Badge Preview */}
+            <div className="flex items-center gap-2 bg-[#F4F1EA] px-2.5 py-1 rounded-xl border border-[#DCD6CB]">
+              <img
+                src="/logo.jpg"
+                alt="Logo officiel"
+                className="w-5 h-5 rounded-md object-cover border border-[#2D5A43]/30"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src = '/favicon.svg';
+                }}
+              />
+              <span className="text-[11px] font-semibold text-[#2D5A43]">Logo officiel actif</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -552,8 +581,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
 
           <p className="text-xs text-[#7A756D] font-editorial italic">
-            Fiches d'identification pré-remplies automatiquement lors de la création de chaque nouveau journal de caisse.
+            Ajout automatique : tout nouveau vendeur ou livreur ajouté ici est immédiatement et automatiquement ajouté à la « Comptabilité des Vendeurs / Livreurs » du journal de caisse.
           </p>
+
+          {/* Notification d'ajout automatique dans la comptabilité */}
+          {sellerSyncNotice && (
+            <div className="bg-[#E7EFEA] border border-[#C3D9CD] text-[#2D5A43] text-xs font-semibold px-4 py-3 rounded-xl flex items-center gap-2.5 animate-fadeIn shadow-xs">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-[#2D5A43]" />
+              <span className="leading-snug">{sellerSyncNotice}</span>
+            </div>
+          )}
 
           {/* Formulaire d'ajout rapide d'un vendeur avec identification complète */}
           {showAddSellerForm && (
