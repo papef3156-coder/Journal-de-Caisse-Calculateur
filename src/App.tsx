@@ -40,7 +40,7 @@ export default function App() {
   const [activePrintJournal, setActivePrintJournal] = useState<DailyJournal | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Listen to Google Auth state
+  // Listen to Auth state (Microsoft / Cloud)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
@@ -166,7 +166,7 @@ export default function App() {
     });
     setCurrentJournal(finalJournal);
 
-    // If logged in with Google, also sync to Cloud
+    // If logged in, also sync to Cloud (Firestore)
     if (currentUser) {
       try {
         await saveJournalToCloud(currentUser.uid, finalJournal);

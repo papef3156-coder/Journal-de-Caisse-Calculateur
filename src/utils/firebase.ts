@@ -2,6 +2,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
+  OAuthProvider,
+  FacebookAuthProvider,
   signInWithPopup, 
   signOut, 
   onAuthStateChanged,
@@ -33,6 +35,75 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
+
+export const microsoftProvider = new OAuthProvider('microsoft.com');
+microsoftProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+microsoftProvider.addScope('User.Read');
+
+/**
+ * Sign in with Microsoft Popup
+ */
+export async function signInWithMicrosoft(): Promise<User> {
+  try {
+    const result = await signInWithPopup(auth, microsoftProvider);
+    const user = result.user;
+
+    // Save/update user profile in firestore
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        provider: 'microsoft.com',
+        lastLoginAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
+    return user;
+  } catch (error: any) {
+    console.error('Error during Microsoft sign-in:', error);
+    throw error;
+  }
+}
+
+export const facebookProvider = new FacebookAuthProvider();
+facebookProvider.addScope('email');
+facebookProvider.addScope('public_profile');
+facebookProvider.setCustomParameters({
+  display: 'popup'
+});
+
+/**
+ * Sign in with Facebook Popup
+ */
+export async function signInWithFacebook(): Promise<User> {
+  try {
+    const result = await signInWithPopup(auth, facebookProvider);
+    const user = result.user;
+
+    // Save/update user profile in firestore
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        provider: 'facebook.com',
+        lastLoginAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
+    return user;
+  } catch (error: any) {
+    console.error('Error during Facebook sign-in:', error);
+    throw error;
+  }
+}
 
 /**
  * Sign in with Google Popup

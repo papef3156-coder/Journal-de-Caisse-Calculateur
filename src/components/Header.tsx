@@ -11,10 +11,11 @@ import {
   TrendingUp,
   BookOpen,
   Clock,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import { useLiveDateTime } from '../utils/dateTime';
-import { GoogleAuthButton } from './GoogleAuthButton';
+import { MicrosoftAuthButton } from './MicrosoftAuthButton';
 import { User } from 'firebase/auth';
 import { DailyJournal } from '../types';
 
@@ -135,11 +136,26 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </nav>
 
-            <GoogleAuthButton
+            <MicrosoftAuthButton
               user={user}
               journals={journals}
               onJournalsLoadedFromCloud={onJournalsLoadedFromCloud}
             />
+
+            {/* If in iframe (e.g. preview mode), show new tab button */}
+            {typeof window !== 'undefined' && window.self !== window.top && (
+              <a
+                id="btn-open-new-tab-header"
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden xl:inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA] transition-colors border border-[#DCD6CB] bg-[#FAFAF7]"
+                title="Ouvrir dans un nouvel onglet autonome (recommandé pour la connexion)"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-[#2D5A43]" />
+                <span>Nouvel onglet</span>
+              </a>
+            )}
 
             <button
               id="btn-quick-new-journal"
