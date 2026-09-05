@@ -24,6 +24,8 @@ interface HeaderProps {
   user: User | null;
   journals: DailyJournal[];
   onJournalsLoadedFromCloud: (journals: DailyJournal[]) => void;
+  isPremium?: boolean;
+  onOpenSubscribeModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,7 +36,9 @@ export const Header: React.FC<HeaderProps> = ({
   todayGain,
   user,
   journals,
-  onJournalsLoadedFromCloud
+  onJournalsLoadedFromCloud,
+  isPremium,
+  onOpenSubscribeModal
 }) => {
   return (
     <header className="bg-[#FAFAF7] border-b border-[#DCD6CB] sticky top-0 z-30 shadow-xs">
@@ -74,45 +78,63 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Main Pages Navigation & Quick Action */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <nav className="flex items-center bg-[#EBE8E0] p-1 rounded-xl border border-[#DCD6CB] gap-0.5">
+            {/* Main Pages Navigation & Quick Action */}
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <nav className="flex items-center bg-[#EBE8E0] p-1 rounded-xl border border-[#DCD6CB] gap-0.5 max-w-full overflow-x-auto">
               <button
                 id="nav-btn-journal"
                 onClick={() => setActivePage('journal')}
-                className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   activePage === 'journal' || activePage === 'dashboard'
                     ? 'bg-[#FAFAF7] text-[#2D5A43] shadow-xs border border-[#DCD6CB]'
                     : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
                 }`}
               >
-                <ReceiptText className="w-4 h-4 text-[#2D5A43]" />
-                <span>Journal de Caisse</span>
+                <ReceiptText className="w-4 h-4 text-[#2D5A43] shrink-0" />
+                <span>Journal</span>
+              </button>
+
+              <button
+                id="nav-btn-history"
+                onClick={() => setActivePage('history')}
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  activePage === 'history'
+                    ? 'bg-[#FAFAF7] text-[#2D5A43] shadow-xs border border-[#DCD6CB]'
+                    : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
+                }`}
+              >
+                <BookOpen className="w-4 h-4 text-[#2D5A43] shrink-0" />
+                <span>Historique</span>
+                {journals.length > 0 && (
+                  <span className="text-[10px] font-mono-num font-bold px-1.5 py-0.2 rounded-full bg-[#E7EFEA] text-[#2D5A43] border border-[#C3D9CD] ml-0.5">
+                    {journals.length}
+                  </span>
+                )}
               </button>
 
               <button
                 id="nav-btn-gains-summary"
                 onClick={() => setActivePage('gains_summary')}
-                className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   activePage === 'gains_summary'
                     ? 'bg-[#FAFAF7] text-[#2D5A43] shadow-xs border border-[#DCD6CB]'
                     : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
                 }`}
               >
-                <TrendingUp className="w-4 h-4 text-[#2D5A43]" />
-                <span>Gains & Synthèse Caisse</span>
+                <TrendingUp className="w-4 h-4 text-[#2D5A43] shrink-0" />
+                <span>Gains & Analyses</span>
               </button>
 
               <button
                 id="nav-btn-settings"
                 onClick={() => setActivePage('settings')}
-                className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   activePage === 'settings'
                     ? 'bg-[#FAFAF7] text-[#1A1A1A] shadow-xs border border-[#DCD6CB]'
                     : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
                 }`}
               >
-                <SettingsIcon className="w-4 h-4 text-[#7A756D]" />
+                <SettingsIcon className="w-4 h-4 text-[#7A756D] shrink-0" />
                 <span className="hidden sm:inline">Paramètres</span>
               </button>
             </nav>

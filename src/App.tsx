@@ -28,8 +28,18 @@ import {
   PlusCircle, 
   CalendarDays,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  Calendar,
+  Crown,
+  CheckCircle2,
+  AlertCircle,
+  X
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { SubscriptionModal } from './components/SubscriptionModal';
+import { SubscriptionPage } from './components/SubscriptionPage';
+import { UserSubscription, PaymentTransaction, PaymentConfig } from './types';
+import { fetchSubscriptionStatus, fetchPaymentConfig, verifyPayment } from './utils/subscriptionApi';
 
 export default function App() {
   const [activePage, setActivePage] = useState<ActivePage>('dashboard');
@@ -39,6 +49,13 @@ export default function App() {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('7days');
   const [activePrintJournal, setActivePrintJournal] = useState<DailyJournal | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Subscription state
+  const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState<boolean>(false);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
+  const [paymentBanner, setPaymentBanner] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   // Listen to Auth state (Microsoft / Cloud)
   useEffect(() => {
@@ -54,6 +71,80 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  const getEffectiveUserId = (): string => {
+    if (currentUser) return currentUser.uid;
+    let localUid = localStorage.getItem('journal_local_uid');
+    if (!localUid) {
+      localUid = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      localStorage.setItem('journal_local_uid', localUid);
+    }
+    return localUid;
+  };
+
+  const loadSubscriptionData = async () => {
+    try {
+      const uid = getEffectiveUserId();
+      const data = await fetchSubscriptionStatus(uid);
+      setSubscription(data.subscription);
+      setTransactions(data.transactions);
+    } catch (err) {
+      console.warn('Subscription fetch error:', err);
+    }
+  };
+
+  // Load payment config and subscription data
+  useEffect(() => {
+    fetchPaymentConfig()
+      .then(cfg => setPaymentConfig(cfg))
+      .catch(err => console.warn('Config fetch error:', err));
+    loadSubscriptionData();
+  }, [currentUser]);
+
+  // Handle return URLs from Wave / Orange Money callbacks
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment_status');
+    const txId = urlParams.get('tx_id') || urlParams.get('order_id');
+    const sessionId = urlParams.get('session_id');
+    const provider = urlParams.get('provider');
+    const sandboxPrompt = urlParams.get('sandbox_prompt');
+
+    if (sandboxPrompt) {
+      setIsSubscribeModalOpen(true);
+    }
+
+    if (paymentStatus && txId) {
+      if (paymentStatus === 'success' || paymentStatus === 'return') {
+        verifyPayment(txId, sessionId || undefined, undefined, provider || undefined)
+          .then((res) => {
+            if (res.success) {
+              confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+              setPaymentBanner({
+                type: 'success',
+                message: "Paiement validé avec succès ! Votre abonnement Premium de 5 000 FCFA a été activé pour 1 mois."
+              });
+              loadSubscriptionData();
+            }
+          })
+          .catch((err) => {
+            setPaymentBanner({
+              type: 'error',
+              message: err.message || "Impossible de confirmer le paiement. Vérifiez votre solde ou contactez le support."
+            });
+          })
+          .finally(() => {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          });
+      } else if (paymentStatus === 'cancelled') {
+        setPaymentBanner({
+          type: 'error',
+          message: "Le paiement a été annulé par l'utilisateur."
+        });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [currentUser]);
 
   const { todayStr: liveTodayStr } = useLiveDateTime();
 
@@ -259,6 +350,7 @@ export default function App() {
 
   const handleSelectJournalFromHistory = (journal: DailyJournal) => {
     setCurrentJournal(journal);
+    setActivePage('journal');
     setDashboardTab('editor');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -414,6 +506,9 @@ export default function App() {
 
   const todayGain = currentJournal?.summary?.netGain || 0;
 
+  const isAccessAllowed = subscription?.status === 'active' || (subscription?.status === 'trial' && (subscription?.trialDaysRemaining ?? 0) > 0);
+  const trialDaysRemaining = subscription?.trialDaysRemaining ?? 7;
+
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#1A1A1A] flex flex-col selection:bg-[#2D5A43] selection:text-white">
       
@@ -432,10 +527,50 @@ export default function App() {
             setCurrentJournal(cloudJournals[0]);
           }
         }}
+        isPremium={isAccessAllowed}
+        onOpenSubscribeModal={() => setIsSubscribeModalOpen(true)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+
+        {/* Payment notification banner */}
+        {paymentBanner && (
+          <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-xs animate-fadeIn ${
+            paymentBanner.type === 'success'
+              ? 'bg-[#E7EFEA] border-[#2D5A43] text-[#2D5A43]'
+              : 'bg-[#FAF0F0] border-[#8B3A3A] text-[#8B3A3A]'
+          }`}>
+            <div className="flex items-center space-x-3 text-xs sm:text-sm font-semibold">
+              {paymentBanner.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 shrink-0 text-[#2D5A43]" />
+              ) : (
+                <AlertCircle className="w-5 h-5 shrink-0 text-[#8B3A3A]" />
+              )}
+              <span>{paymentBanner.message}</span>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePage('subscription');
+                  setPaymentBanner(null);
+                }}
+                className="px-3 py-1 bg-white rounded-lg text-xs font-bold border border-current shadow-xs cursor-pointer hover:opacity-80"
+              >
+                Voir mon abonnement
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentBanner(null)}
+                className="p-1 rounded-lg hover:bg-black/10 text-current cursor-pointer"
+                title="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
         
         {/* PAGE 1: JOURNAL DE CAISSE (SAISIE QUOTIDIENNE & HISTORIQUE) */}
         {(activePage === 'journal' || activePage === 'dashboard') && (
@@ -479,32 +614,58 @@ export default function App() {
                 onUpdateSettings={handleSaveSettings}
               />
             </section>
+          </div>
+        )}
 
-            {/* HISTORIQUE DES JOURNAUX DE CAISSE */}
-            <section id="section-historique" className="space-y-4 pt-4 border-t border-[#DCD6CB]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="w-3 h-3 rounded-full bg-[#2D5A43]"></span>
-                  <h2 className="text-lg font-bold font-editorial text-[#1A1A1A]">
-                    Historique des Journaux
-                  </h2>
-                </div>
-                <span className="text-xs text-[#7A756D] font-medium font-editorial">
-                  {journals.length} {journals.length > 1 ? 'journaux enregistrés' : 'journal enregistré'}
-                </span>
+        {/* PAGE HISTORIQUE DÉDIÉE */}
+        {activePage === 'history' && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Action & Info Banner */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[#DCD6CB] shadow-xs">
+              <div>
+                <h2 className="text-xl font-bold font-editorial text-[#1A1A1A] flex items-center gap-2">
+                  <Calendar className="w-6 h-6 text-[#2D5A43]" />
+                  <span>Gestion & Historique des Journaux</span>
+                </h2>
+                <p className="text-xs text-[#7A756D] font-editorial mt-1">
+                  Consultez, modifiez, imprimez vos tickets de caisse ou supprimez vos archives de journaux quotidiens.
+                </p>
               </div>
 
-              <JournalHistoryList
-                journals={journals}
-                currency={settings.currency}
-                activeJournalId={currentJournal.id}
-                onSelectJournal={handleSelectJournalFromHistory}
-                onDeleteJournal={handleDeleteJournal}
-                onDeleteMultipleJournals={handleDeleteMultipleJournals}
-                onPrintJournal={(j) => setActivePrintJournal(j)}
-              />
-            </section>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  id="btn-history-new-journal"
+                  onClick={() => {
+                    handleNewJournal();
+                    setActivePage('journal');
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2.5 bg-[#2D5A43] hover:bg-[#234735] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Nouveau Journal du Jour</span>
+                </button>
 
+                <button
+                  id="btn-history-goto-gains"
+                  onClick={() => setActivePage('gains_summary')}
+                  className="flex items-center space-x-2 px-3.5 py-2.5 bg-[#F4F1EA] hover:bg-[#EBE8E0] text-[#2D5A43] rounded-xl text-xs font-bold border border-[#DCD6CB] transition-all cursor-pointer"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Voir Synthèse & Gains →</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Full Journal History List with Multi-Select & Search */}
+            <JournalHistoryList
+              journals={journals}
+              currency={settings.currency}
+              activeJournalId={currentJournal.id}
+              onSelectJournal={handleSelectJournalFromHistory}
+              onDeleteJournal={handleDeleteJournal}
+              onDeleteMultipleJournals={handleDeleteMultipleJournals}
+              onPrintJournal={(j) => setActivePrintJournal(j)}
+            />
           </div>
         )}
 
@@ -541,6 +702,20 @@ export default function App() {
           </div>
         )}
 
+        {/* PAGE 4: MON ABONNEMENT (OFFRE PREMIUM 5 000 FCFA - WAVE & ORANGE MONEY) */}
+        {activePage === 'subscription' && (
+          <div className="animate-fadeIn">
+            <SubscriptionPage
+              user={currentUser}
+              subscription={subscription}
+              transactions={transactions}
+              paymentConfig={paymentConfig}
+              onOpenSubscribeModal={() => setIsSubscribeModalOpen(true)}
+              onRefresh={loadSubscriptionData}
+            />
+          </div>
+        )}
+
       </main>
 
       {/* Footer */}
@@ -550,7 +725,7 @@ export default function App() {
             {settings.businessName} — Gestion commerciale, Journal de caisse & Calcul des bénéfices
           </p>
           <p className="text-[#8C877E]">
-            Calculs automatiques Aujourd'hui, Tous les Jours, 1 Mois et 1 An • Données sauvegardées en local
+            Calculs automatiques Aujourd'hui, Tous les Jours, 1 Mois et 1 An • Paiements Wave & Orange Money certifiés
           </p>
         </div>
       </footer>
@@ -563,6 +738,18 @@ export default function App() {
           onClose={() => setActivePrintJournal(null)}
         />
       )}
+
+      {/* Subscription Modal for Wave & Orange Money */}
+      <SubscriptionModal
+        isOpen={isSubscribeModalOpen}
+        onClose={() => setIsSubscribeModalOpen(false)}
+        user={currentUser}
+        subscription={subscription}
+        paymentConfig={paymentConfig}
+        onSubscriptionUpdated={() => {
+          loadSubscriptionData();
+        }}
+      />
 
     </div>
   );

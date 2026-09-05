@@ -77,8 +77,71 @@ export interface AppSettings {
   autoSendChannel?: 'gmail' | 'messages' | 'modal';
 }
 
-export type ActivePage = 'journal' | 'gains_summary' | 'settings' | 'dashboard';
+export type ActivePage = 'journal' | 'history' | 'gains_summary' | 'settings' | 'dashboard' | 'subscription';
 export type TimePeriod = 'today' | '7days' | 'month' | 'year' | 'all';
+
+export interface UserSubscription {
+  userId: string;
+  userEmail?: string;
+  status: 'trial' | 'active' | 'expired';
+  plan: 'premium_monthly' | 'trial' | 'free';
+  amount: number;
+  currency: string;
+  startDate: string | null;
+  endDate: string | null;
+  trialStartDate?: string | null;
+  trialEndDate?: string | null;
+  trialUsed?: boolean;
+  trialDaysRemaining?: number;
+  paymentMethod: 'wave' | 'orange_money' | 'manual' | null;
+  lastTransactionId?: string;
+  senderPhone?: string;
+  paymentReference?: string;
+  updatedAt?: string;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  userId: string;
+  userEmail?: string;
+  amount: number;
+  currency: string;
+  paymentMethod: 'wave' | 'orange_money' | 'wave_om' | 'manual';
+  targetPhone?: string;
+  senderPhone?: string;
+  paymentReference?: string;
+  status: 'pending_verification' | 'pending' | 'completed' | 'failed' | 'cancelled' | 'expired' | 'rejected';
+  providerReference?: string;
+  checkoutUrl?: string;
+  verificationNote?: string;
+  verifiedBy?: string;
+  createdAt: string;
+  completedAt?: string;
+  errorMessage?: string;
+  isCredited?: boolean;
+}
+
+export interface PaymentConfig {
+  plan: {
+    id: string;
+    name: string;
+    price: number;
+    currency: string;
+    currencyCode: string;
+    durationDays: number;
+    trialDurationDays: number;
+    merchantPhone: string;
+    description: string;
+  };
+  merchantPhone: string;
+  paymentMode: 'sandbox' | 'production';
+  isWaveConfigured: boolean;
+  isOrangeMoneyConfigured: boolean;
+  webhooks: {
+    wave: string;
+    orangeMoney: string;
+  };
+}
 
 export interface MonthlyProfitRecord {
   id: string;              // ex: "month-2026-09"

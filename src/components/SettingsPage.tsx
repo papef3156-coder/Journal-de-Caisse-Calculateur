@@ -300,26 +300,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         
         {/* 1. Informations de l'Établissement & Nom */}
         <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#EBE8E0] pb-3">
-            <div className="flex items-center space-x-2">
-              <Store className="w-5 h-5 text-[#2D5A43]" />
-              <h3 className="font-bold text-[#1A1A1A] font-editorial text-base">
-                Informations du Commerce
-              </h3>
-            </div>
-            {/* Logo Badge Preview */}
-            <div className="flex items-center gap-2 bg-[#F4F1EA] px-2.5 py-1 rounded-xl border border-[#DCD6CB]">
-              <img
-                src="/logo.jpg"
-                alt="Logo officiel"
-                className="w-5 h-5 rounded-md object-cover border border-[#2D5A43]/30"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  e.currentTarget.src = '/favicon.svg';
-                }}
-              />
-              <span className="text-[11px] font-semibold text-[#2D5A43]">Logo officiel actif</span>
-            </div>
+          <div className="flex items-center space-x-2 border-b border-[#EBE8E0] pb-3">
+            <Store className="w-5 h-5 text-[#2D5A43]" />
+            <h3 className="font-bold text-[#1A1A1A] font-editorial text-base">
+              Informations du Commerce
+            </h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

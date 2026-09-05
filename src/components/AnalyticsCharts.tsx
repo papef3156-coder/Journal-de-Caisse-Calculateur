@@ -21,12 +21,8 @@ import {
 import {
   TrendingUp,
   BarChart3,
-  CheckCircle2,
   Calendar,
   Clock,
-  ChevronDown,
-  ChevronUp,
-  FileSpreadsheet,
 } from 'lucide-react';
 
 interface AnalyticsChartsProps {
@@ -47,7 +43,6 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
   // Defaults to daily view to show day-by-day profits as requested
   const [chartViewMode, setChartViewMode] = useState<'daily' | 'monthly'>('daily');
   const [monthlyRecords, setMonthlyRecords] = useState<MonthlyProfitRecord[]>([]);
-  const [showMonthlyHistoryTable, setShowMonthlyHistoryTable] = useState<boolean>(true);
 
   // Automatically consolidate and save monthly records in background whenever journals change
   useEffect(() => {
@@ -312,93 +307,6 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
           </div>
         </div>
 
-      </div>
-
-      {/* TABLEAU HISTORIQUE DES ENREGISTREMENTS MENSUELS (TOUS LES 1 MOIS) */}
-      <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-[#2D5A43]" />
-            <div>
-              <h3 className="font-bold text-[#1A1A1A] font-editorial text-base flex items-center gap-2">
-                <span>Registre des Enregistrements Mensuels (Tous les 1 mois)</span>
-                <span className="text-xs bg-[#E7EFEA] text-[#2D5A43] font-semibold px-2 py-0.5 rounded-full border border-[#C3D9CD]">
-                  {monthlyRecords.length} {monthlyRecords.length > 1 ? 'mois enregistrés' : 'mois enregistré'}
-                </span>
-              </h3>
-              <p className="text-xs text-[#7A756D] font-editorial italic">
-                Archives et bilans automatiques consolidés mois par mois avec bénéfice net et chiffre d'affaires
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowMonthlyHistoryTable(!showMonthlyHistoryTable)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#DCD6CB] bg-[#F4F1EA] hover:bg-[#EBE8E0] text-[#5C574F] flex items-center gap-1 cursor-pointer"
-          >
-            <span>{showMonthlyHistoryTable ? 'Masquer le tableau' : 'Afficher le tableau'}</span>
-            {showMonthlyHistoryTable ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {showMonthlyHistoryTable && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[#EBE8E0] text-[#1A1A1A] border-b border-[#DCD6CB] font-editorial font-bold">
-                  <th className="py-2.5 px-3">Période (Mois)</th>
-                  <th className="py-2.5 px-3 text-right">Bénéfice Net Enregistré</th>
-                  <th className="py-2.5 px-3 text-right">Chiffre d’Affaires</th>
-                  <th className="py-2.5 px-3 text-right">Unités Vendues</th>
-                  <th className="py-2.5 px-3 text-right">Retours</th>
-                  <th className="py-2.5 px-3 text-right">Pertes</th>
-                  <th className="py-2.5 px-3 text-right">Dépenses</th>
-                  <th className="py-2.5 px-3 text-center">Jours de Vente</th>
-                  <th className="py-2.5 px-3 text-center">Statut d'Enregistrement</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EBE8E0]">
-                {monthlyRecords.map((record) => (
-                  <tr key={record.id} className="hover:bg-[#F4F1EA] transition-colors">
-                    <td className="py-2.5 px-3 font-semibold text-[#1A1A1A] flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-[#2D5A43]" />
-                      <span>{record.monthLabel}</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-bold text-[#2D5A43]">
-                      +{formatCurrency(record.totalNetGain, currency)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-semibold text-[#1A1A1A]">
-                      {formatCurrency(record.totalGrossRevenue, currency)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-[#5C574F]">
-                      {formatNumber(record.totalSoldUnits)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-[#9C6B28]">
-                      {formatNumber(record.totalReturnUnits)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-[#8B3A3A]">
-                      {formatNumber(record.totalLostUnits)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-[#5C574F]">
-                      {formatCurrency(record.totalExpenses, currency)}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="font-semibold text-[#1A1A1A]">
-                        {record.daysCount} {record.daysCount > 1 ? 'jours' : 'jour'}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-[#E7EFEA] text-[#2D5A43] px-2 py-0.5 rounded-full border border-[#C3D9CD]">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Enregistré auto</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
     </div>

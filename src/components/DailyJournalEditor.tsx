@@ -12,12 +12,12 @@ import {
   Save, 
   Printer, 
   Plus, 
+  PlusCircle,
   Trash2, 
   RotateCcw, 
   AlertCircle, 
   CheckCircle2, 
   Calendar, 
-  Tag, 
   Receipt, 
   UserPlus, 
   TrendingUp, 
@@ -723,7 +723,8 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
         )}
 
         {/* Configurations rapides du jour (Date) */}
-        <div className="pt-4 text-sm max-w-md">
+        <div className="pt-4 border-t border-[#EBE8E0]">
+          {/* Colonne Date */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-[#4A463F] flex items-center gap-1.5 font-editorial">
@@ -747,7 +748,7 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                 type="button"
                 onClick={() => handleDateChange(liveTodayStr)}
                 title="Mettre à jour sur la date actuelle du jour"
-                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer shrink-0 ${
                   date === liveTodayStr
                     ? 'bg-[#2D5A43] text-white border-[#2D5A43] shadow-xs'
                     : 'bg-[#EBE8E0] text-[#3D3A34] hover:bg-[#DCD6CB] border-[#DCD6CB]'
@@ -808,6 +809,59 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
             <p className="text-xs text-[#7A756D] font-editorial italic mt-0.5">
               Saisissez vos quantités : les calculs de caisse sont mis à jour en direct.
             </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Mode de calcul selector */}
+            <div className="flex items-center bg-[#FAFAF7] border border-[#DCD6CB] rounded-xl p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setSellerAutoCalcMode('return_from_sold')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  sellerAutoCalcMode === 'return_from_sold'
+                    ? 'bg-[#2D5A43] text-white shadow-xs'
+                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
+                }`}
+                title="Confié - Vente = Retour automatique"
+              >
+                Retour Auto
+              </button>
+              <button
+                type="button"
+                onClick={() => setSellerAutoCalcMode('sold_from_return')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  sellerAutoCalcMode === 'sold_from_return'
+                    ? 'bg-[#2D5A43] text-white shadow-xs'
+                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
+                }`}
+                title="Confié - Retour = Vente automatique"
+              >
+                Vente Auto
+              </button>
+              <button
+                type="button"
+                onClick={() => setSellerAutoCalcMode('manual')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  sellerAutoCalcMode === 'manual'
+                    ? 'bg-[#2D5A43] text-white shadow-xs'
+                    : 'text-[#5C574F] hover:text-[#1A1A1A]'
+                }`}
+                title="Saisie manuelle des deux valeurs"
+              >
+                Manuel
+              </button>
+            </div>
+
+            {/* Add seller button */}
+            <button
+              type="button"
+              id="btn-add-seller-header"
+              onClick={() => handleAddSeller()}
+              className="flex items-center space-x-1 px-3 py-1.5 bg-[#2D5A43] hover:bg-[#234735] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Ajouter un vendeur</span>
+            </button>
           </div>
         </div>
 
@@ -923,6 +977,132 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        {/* Barre d'action sous le tableau */}
+        <div className="p-3 bg-[#EBE8E0]/50 border-t border-[#DCD6CB] flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            id="btn-add-seller-footer"
+            onClick={() => handleAddSeller()}
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-[#F4F1EA] text-[#2D5A43] border border-[#DCD6CB] rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Ajouter une ligne de vendeur</span>
+          </button>
+
+          <span className="text-xs text-[#7A756D] font-editorial italic">
+            {sellers.length} vendeur(s) comptabilisé(s) dans le journal
+          </span>
+        </div>
+
+      </div>
+
+      {/* 4. DÉPENSES & CHARGES DU JOUR & NOTES / OBSERVATIONS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        {/* Dépenses / Frais du jour */}
+        <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-4 sm:p-5 shadow-xs space-y-3" id="section-daily-expenses">
+          <div className="flex items-center justify-between pb-2 border-b border-[#EBE8E0]">
+            <div className="flex items-center space-x-2">
+              <Receipt className="w-4 h-4 text-[#8B3A3A]" />
+              <h4 className="font-bold text-[#1A1A1A] font-editorial text-sm sm:text-base">
+                Dépenses & Frais du Jour
+              </h4>
+            </div>
+
+            <span className="text-xs font-bold font-mono-num px-2.5 py-0.5 rounded-full bg-[#FAF3E8] text-[#9C6B28] border border-[#E8D9C0]">
+              Total : {formatCurrency(summary.totalExpenses, settings.currency)}
+            </span>
+          </div>
+
+          <p className="text-xs text-[#7A756D] font-editorial italic">
+            Transport, sacs, carburant ou petites réparations à déduire du bénéfice net.
+          </p>
+
+          {expenses.length === 0 ? (
+            <div className="py-4 text-center bg-[#F4F1EA] rounded-xl border border-dashed border-[#DCD6CB]">
+              <p className="text-xs text-[#7A756D]">Aucune dépense enregistrée pour cette journée.</p>
+              <button
+                type="button"
+                onClick={handleAddExpense}
+                className="mt-2 inline-flex items-center space-x-1 px-3 py-1 bg-white text-[#2D5A43] border border-[#DCD6CB] rounded-lg text-xs font-bold hover:bg-[#F4F1EA] cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Ajouter une dépense</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {expenses.map((expense) => (
+                <div key={expense.id} className="flex items-center gap-2 bg-[#F4F1EA] p-2 rounded-xl border border-[#DCD6CB]">
+                  <input
+                    type="text"
+                    value={expense.label}
+                    onChange={(e) => handleExpenseChange(expense.id, 'label', e.target.value)}
+                    placeholder="Libellé (ex: Carburant, Sacs...)"
+                    className="flex-1 bg-white border border-[#DCD6CB] rounded-lg px-2.5 py-1 text-xs text-[#1A1A1A] font-medium focus:outline-none focus:ring-1 focus:ring-[#2D5A43]"
+                  />
+                  <div className="flex items-center w-28 shrink-0">
+                    <input
+                      type="number"
+                      min="0"
+                      value={expense.amount}
+                      onChange={(e) => handleExpenseChange(expense.id, 'amount', e.target.value)}
+                      className="w-full bg-white border border-[#DCD6CB] rounded-lg px-2 py-1 text-xs font-bold font-mono-num text-right text-[#8B3A3A] focus:outline-none focus:ring-1 focus:ring-[#8B3A3A]"
+                    />
+                    <span className="text-[10px] font-semibold text-[#7A756D] ml-1 shrink-0">{settings.currency}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveExpense(expense.id)}
+                    title="Supprimer cette dépense"
+                    className="p-1 text-[#8C877E] hover:text-[#8B3A3A] transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+
+              <div className="pt-1 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleAddExpense}
+                  className="flex items-center space-x-1 px-3 py-1 bg-white text-[#2D5A43] border border-[#DCD6CB] rounded-lg text-xs font-bold hover:bg-[#F4F1EA] cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Ajouter une autre dépense</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Notes & Observations du jour */}
+        <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-4 sm:p-5 shadow-xs space-y-3" id="section-daily-notes">
+          <div className="flex items-center justify-between pb-2 border-b border-[#EBE8E0]">
+            <div className="flex items-center space-x-2">
+              <FileText className="w-4 h-4 text-[#2D5A43]" />
+              <h4 className="font-bold text-[#1A1A1A] font-editorial text-sm sm:text-base">
+                Notes & Observations du Jour
+              </h4>
+            </div>
+            <span className="text-[10px] text-[#7A756D] font-editorial italic">
+              Sauvegardées avec le journal
+            </span>
+          </div>
+
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={4}
+            placeholder="Ex : Pluie le matin ayant ralenti les ventes, commande spéciale école livrée par Moussa, panne de four résolue à 10h..."
+            className="w-full bg-[#F4F1EA] border border-[#DCD6CB] rounded-xl p-3 text-xs text-[#1A1A1A] font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D5A43] resize-none"
+          />
+
+          <div className="flex items-center justify-between text-[11px] text-[#7A756D] font-editorial">
+            <span>Ces remarques figureront dans l'historique et sur les impressions.</span>
+          </div>
         </div>
 
       </div>
