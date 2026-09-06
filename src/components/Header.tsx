@@ -9,11 +9,13 @@ import {
   ReceiptText,
   TrendingUp,
   BookOpen,
-  ExternalLink
+  ExternalLink,
+  Camera
 } from 'lucide-react';
 import { MicrosoftAuthButton } from './MicrosoftAuthButton';
 import { User } from 'firebase/auth';
 import { DailyJournal } from '../types';
+import defaultStoreLogo from '../assets/images/store_profile_logo_1788716413614.jpg';
 
 interface HeaderProps {
   activePage: ActivePage;
@@ -40,6 +42,37 @@ export const Header: React.FC<HeaderProps> = ({
   isPremium,
   onOpenSubscribeModal
 }) => {
+  const [profileLogo, setProfileLogo] = React.useState<string>(() => {
+    return localStorage.getItem('app_custom_profile_logo') || defaultStoreLogo;
+  });
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('app_custom_profile_logo');
+      setProfileLogo(saved || defaultStoreLogo);
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('profile-logo-updated', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('profile-logo-updated', handleStorageChange);
+    };
+  }, []);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setProfileLogo(dataUrl);
+      localStorage.setItem('app_custom_profile_logo', dataUrl);
+      window.dispatchEvent(new Event('profile-logo-updated'));
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <header className="bg-[#FAFAF7] border-b border-[#DCD6CB] sticky top-0 z-30 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -51,18 +84,36 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => setActivePage('journal')}
               className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden shadow-xs border border-[#2D5A43]/20 bg-[#1B382B] flex items-center justify-center shrink-0 transition-transform hover:scale-105 cursor-pointer group"
-              title="Journal de Caisse & Calculateur de Gains - Revenir au Journal"
+              title="Journal de Caisse & Calculateur de Gains - Revenir au Journal (Survolez pour modifier la photo)"
             >
               <img
-                src="/logo.jpg"
+                src={profileLogo}
                 alt="Logo Journal de Caisse & Calculateur de Gains"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
-                  e.currentTarget.src = '/favicon.svg';
+                  e.currentTarget.src = defaultStoreLogo;
                 }}
               />
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-semibold"
+                title="Changer la photo de profil"
+              >
+                <Camera className="w-3.5 h-3.5 mb-0.5" />
+                <span>Changer</span>
+              </span>
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
             <div>
               <div className="flex items-center space-x-2.5">
                 <button

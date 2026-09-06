@@ -498,12 +498,11 @@ export const ProfitMetricCards: React.FC<ProfitMetricCardsProps> = ({
                 <optgroup label="Année en cours (2026)">
                   {MONTH_NAMES_FR.map((name, idx) => {
                     const key = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
-                    const hasData = !!(monthlyDataMap[key] && monthlyDataMap[key].daysCount > 0);
                     const isFull = (monthlyDataMap[key]?.daysCount || 0) >= 28;
-                    const suffix = isFull ? '✓' : (hasData ? `(En cours - 0 ${currency})` : `(0 ${currency})`);
+                    const suffix = isFull ? ' ✓' : '';
                     return (
                       <option key={key} value={key}>
-                        {name} {currentYear} {suffix}
+                        {name} {currentYear}{suffix}
                       </option>
                     );
                   })}
@@ -516,12 +515,11 @@ export const ProfitMetricCards: React.FC<ProfitMetricCardsProps> = ({
                     .flatMap((y) =>
                       MONTH_NAMES_FR.map((name, idx) => {
                         const key = `${y}-${String(idx + 1).padStart(2, '0')}`;
-                        const hasData = !!(monthlyDataMap[key] && monthlyDataMap[key].daysCount > 0);
                         const isFull = (monthlyDataMap[key]?.daysCount || 0) >= 28;
-                        const suffix = isFull ? '✓' : `(0 ${currency})`;
+                        const suffix = isFull ? ' ✓' : '';
                         return (
                           <option key={key} value={key}>
-                            {name} {y} {suffix}
+                            {name} {y}{suffix}
                           </option>
                         );
                       })
@@ -617,11 +615,10 @@ export const ProfitMetricCards: React.FC<ProfitMetricCardsProps> = ({
                 {availableYears.map((y) => {
                   const yCount = yearlyDataMap[String(y)]?.daysCount || 0;
                   const isFull = yCount >= 350;
-                  const hasData = yCount > 0;
-                  const suffix = isFull ? '✓' : (hasData ? `(En cours - 0 ${currency})` : `(0 ${currency})`);
+                  const suffix = isFull ? ' ✓' : '';
                   return (
                     <option key={y} value={String(y)}>
-                      Année {y} {suffix}
+                      Année {y}{suffix}
                     </option>
                   );
                 })}

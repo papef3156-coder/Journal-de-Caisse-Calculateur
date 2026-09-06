@@ -34,9 +34,11 @@ import {
   FileSpreadsheet,
   Mail,
   MessageSquare,
-  Send
+  Send,
+  Camera
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import defaultStoreLogo from '../assets/images/store_profile_logo_1788716413614.jpg';
 import {
   isFileSystemAccessSupported,
   connectLocalPcFolder,
@@ -73,7 +75,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [justSyncedTime, setJustSyncedTime] = useState(false);
+  const [profileLogo, setProfileLogo] = useState<string>(() => {
+    return localStorage.getItem('app_custom_profile_logo') || defaultStoreLogo;
+  });
   const [folderName, setFolderName] = useState<string | null>(getSavedLocalFolderName());
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setProfileLogo(dataUrl);
+      localStorage.setItem('app_custom_profile_logo', dataUrl);
+      window.dispatchEvent(new Event('profile-logo-updated'));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetLogo = () => {
+    localStorage.removeItem('app_custom_profile_logo');
+    setProfileLogo(defaultStoreLogo);
+    window.dispatchEvent(new Event('profile-logo-updated'));
+  };
   const [isSyncingFolder, setIsSyncingFolder] = useState(false);
   const [folderSyncMsg, setFolderSyncMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const hasFsAccess = isFileSystemAccessSupported();
@@ -338,6 +362,53 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <option value="MAD">Dirham Marocain (MAD)</option>
                 <option value="DZD">Dinar Algérien (DZD)</option>
               </select>
+            </div>
+          </div>
+
+          {/* Profil / Logo du Commerce */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#F4F1EA]/70 p-3.5 rounded-xl border border-[#DCD6CB] mt-2">
+            <div className="flex items-center space-x-3.5">
+              <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-xs border border-[#2D5A43]/30 bg-[#1B382B] shrink-0">
+                <img
+                  src={profileLogo}
+                  alt="Logo du commerce"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.src = defaultStoreLogo;
+                  }}
+                />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#1A1A1A] font-editorial">Photo de profil & Logo de l'établissement</p>
+                <p className="text-[11px] text-[#7A756D] font-editorial italic">
+                  Visible dans l'en-tête de page et sur vos bilans
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#2D5A43] hover:bg-[#234735] text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer transition-all">
+                <Camera className="w-3.5 h-3.5" />
+                <span>Changer la photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                />
+              </label>
+              {localStorage.getItem('app_custom_profile_logo') && (
+                <button
+                  type="button"
+                  onClick={handleResetLogo}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-[#EBE8E0] text-[#5C574F] border border-[#DCD6CB] text-xs font-semibold rounded-lg cursor-pointer transition-all"
+                  title="Rétablir le logo officiel"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Rétablir</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
