@@ -8,7 +8,7 @@ import {
   syncAllJournalsToCloud, 
   loadJournalsFromCloud 
 } from '../utils/firebase';
-import { DailyJournal } from '../types';
+import { DailyJournal, PhoneAccount, UserSubscription } from '../types';
 import { 
   LogOut, 
   Cloud, 
@@ -22,7 +22,14 @@ import {
   X,
   ListOrdered,
   User as UserIcon,
-  Sparkles
+  Sparkles,
+  Phone,
+  Crown,
+  Gift,
+  KeyRound,
+  Calendar,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 
 interface AuthErrorInfo {
@@ -35,12 +42,22 @@ interface MicrosoftAuthButtonProps {
   user: User | null;
   journals: DailyJournal[];
   onJournalsLoadedFromCloud: (journals: DailyJournal[]) => void;
+  phoneAccount?: PhoneAccount | null;
+  subscription?: UserSubscription | null;
+  onOpenPhoneAuthModal?: (mode: 'register' | 'login') => void;
+  onOpenSubscribeModal?: () => void;
+  onLogoutPhoneAccount?: () => void;
 }
 
 export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
   user,
   journals,
-  onJournalsLoadedFromCloud
+  onJournalsLoadedFromCloud,
+  phoneAccount,
+  subscription,
+  onOpenPhoneAuthModal,
+  onOpenSubscribeModal,
+  onLogoutPhoneAccount
 }) => {
   const [loading, setLoading] = useState<string | null>(null); // 'microsoft' | 'facebook' | 'google' | null
   const [syncing, setSyncing] = useState(false);
@@ -384,28 +401,168 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
       {/* Profile & Accounts Dropdown Modal */}
       {showProfileMenu && (
         <div 
-          className="absolute right-0 top-full mt-2 w-76 sm:w-84 bg-white rounded-2xl shadow-2xl border border-[#DCD6CB] p-3.5 z-50 animate-fade-in text-left"
+          className="absolute right-0 top-full mt-2 w-80 sm:w-88 bg-white rounded-2xl shadow-2xl border border-[#DCD6CB] p-3.5 z-50 animate-fade-in text-left"
           onMouseLeave={() => setShowProfileMenu(false)}
         >
+          {/* Section 1: Phone Account Status (if logged in with phone) */}
+          {phoneAccount ? (
+            <div className="space-y-3 pb-3 border-b border-[#EBE8E0]">
+              <div className="flex items-center space-x-3 p-3 bg-[#FAF9F5] border border-[#EBE8E0] rounded-xl">
+                <div className="w-11 h-11 rounded-full bg-[#2D5A43] text-white flex items-center justify-center text-sm font-bold shrink-0 shadow-2xs">
+                  <Phone className="w-5 h-5 text-white" />
+                </div>
+                <div className="overflow-hidden flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-xs font-bold text-[#1A1A1A] truncate">{phoneAccount.displayName}</p>
+                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-[#E7EFEA] text-[#2D5A43] font-bold border border-[#C3D9CD]">
+                      Tél
+                    </span>
+                  </div>
+                  <p className="text-xs font-mono text-[#5C574F] font-semibold">{phoneAccount.displayPhone}</p>
+                </div>
+              </div>
+
+              {/* Subscription Details inside Phone Account */}
+              <div className="p-2.5 rounded-xl border border-[#DCD6CB] bg-[#FAFAF7] space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#7A756D] font-medium flex items-center gap-1.5">
+                    <Crown className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    <span>Abonnement :</span>
+                  </span>
+                  {subscription?.status === 'active' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E7EFEA] text-[#2D5A43] border border-[#C3D9CD] flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Actif
+                    </span>
+                  ) : subscription?.status === 'trial' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF3E8] text-[#9C6B28] border border-[#E8D9C0] flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Essai gratuit ({subscription.trialDaysRemaining ?? 7}j)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF0F0] text-[#8B3A3A] border border-[#8B3A3A]/30">
+                      Expiré
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-[#5C574F]">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-[#7A756D]" />
+                    <span>Date d'expiration :</span>
+                  </span>
+                  <span className="font-semibold text-[#1A1A1A]">
+                    {subscription?.expiresAt
+                      ? new Date(subscription.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                      : '—'}
+                  </span>
+                </div>
+
+                {/* Manage / Renew button */}
+                <button
+                  type="button"
+                  id="btn-profile-manage-sub"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    onOpenSubscribeModal?.();
+                  }}
+                  className="w-full mt-1 py-1.5 px-3 rounded-lg bg-[#2D5A43] hover:bg-[#234735] text-white text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Crown className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>{subscription?.status === 'active' ? "Gérer l'abonnement" : "Renouveler (Wave / OM)"}</span>
+                </button>
+              </div>
+
+              {/* Logout Phone Account */}
+              {onLogoutPhoneAccount && (
+                <button
+                  type="button"
+                  id="btn-logout-phone-account"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    onLogoutPhoneAccount();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-1.5 text-xs text-[#8B3A3A] hover:bg-[#FAF0F0] rounded-lg font-medium transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Déconnecter le compte {phoneAccount.displayPhone}</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            /* Phone Auth Prompt (when NOT logged in with phone) */
+            <div className="space-y-2 pb-3 border-b border-[#EBE8E0]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[#7A756D] uppercase tracking-wider">
+                  Compte Téléphone & Abonnement
+                </span>
+                <span className="bg-[#FAF3E8] text-[#9C6B28] text-[10px] font-bold px-1.5 py-0.2 rounded border border-[#E8D9C0]">
+                  7 jours offerts
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1.5">
+                {/* 1. Register with Phone (7 days free) */}
+                <button
+                  type="button"
+                  id="menu-btn-phone-register"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    onOpenPhoneAuthModal?.('register');
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-white bg-[#2D5A43] hover:bg-[#234735] transition-all cursor-pointer shadow-xs"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <Gift className="w-4 h-4 text-[#D4AF37]" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <div className="font-bold text-[13px] flex items-center justify-between">
+                      <span>Créer un compte</span>
+                      <span className="text-[10px] bg-[#D4AF37] text-[#1B382B] font-black px-1.5 rounded">7j GRATUIT</span>
+                    </div>
+                    <div className="text-[10px] text-white/80">Inscription rapide avec numéro de téléphone</div>
+                  </div>
+                </button>
+
+                {/* 2. Login with Phone */}
+                <button
+                  type="button"
+                  id="menu-btn-phone-login"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    onOpenPhoneAuthModal?.('login');
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-[#1A1A1A] bg-[#FAF9F5] hover:bg-[#F3F2F1] border border-[#DCD6CB] transition-colors cursor-pointer"
+                >
+                  <KeyRound className="w-4 h-4 text-[#2D5A43] shrink-0" />
+                  <div className="text-left flex-1">
+                    <div className="font-bold text-xs">Se connecter avec numéro</div>
+                    <div className="text-[10px] text-[#7A756D]">Accéder à votre compte existant</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {!user ? (
             /* Guest / Profile Login Selector */
-            <div className="space-y-3">
+            <div className="space-y-3 pt-2">
               {/* Profile Card Header */}
               <div className="flex items-center gap-3 p-2.5 bg-[#FAF9F5] border border-[#EBE8E0] rounded-xl">
-                <div className="w-11 h-11 rounded-full bg-[#EBE8E0] border border-[#DCD6CB] flex items-center justify-center text-[#2D5A43] shrink-0 shadow-2xs">
-                  <UserIcon className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-full bg-[#EBE8E0] border border-[#DCD6CB] flex items-center justify-center text-[#2D5A43] shrink-0 shadow-2xs">
+                  <UserIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-[#1A1A1A]">Profil Invité (Hors-ligne)</div>
+                  <div className="text-xs font-bold text-[#1A1A1A]">Profil Cloud (Optionnel)</div>
                   <div className="text-[11px] text-[#7A756D] leading-tight">
-                    Connectez un compte pour sécuriser et synchroniser vos journaux
+                    Synchronisez vos journaux sur plusieurs appareils
                   </div>
                 </div>
               </div>
 
               <div className="pt-1">
                 <span className="text-[10px] font-bold text-[#7A756D] uppercase tracking-wider block px-1 mb-1.5">
-                  Mise sur liste des connexions
+                  Autres connexions Cloud
                 </span>
 
                 <div className="space-y-1.5">
@@ -414,7 +571,7 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
                     id="menu-btn-facebook"
                     onClick={handleSignInFacebook}
                     disabled={loading !== null}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-white bg-[#1877F2] hover:bg-[#166FE5] transition-colors cursor-pointer shadow-2xs"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-white bg-[#1877F2] hover:bg-[#166FE5] transition-colors cursor-pointer shadow-2xs"
                   >
                     {loading === 'facebook' ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -424,8 +581,8 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
                       </svg>
                     )}
                     <div className="text-left flex-1">
-                      <div className="font-bold text-[13px]">Connexion Facebook</div>
-                      <div className="text-[10px] text-white/80">Compte Facebook personnel ou pro</div>
+                      <div className="font-bold text-xs">Connexion Facebook</div>
+                      <div className="text-[10px] text-white/80">Compte personnel ou pro</div>
                     </div>
                   </button>
 
@@ -434,7 +591,7 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
                     id="menu-btn-microsoft"
                     onClick={handleSignInMicrosoft}
                     disabled={loading !== null}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-[#1A1A1A] bg-[#FAFAF7] hover:bg-[#F3F2F1] border border-[#DCD6CB] transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-[#1A1A1A] bg-[#FAFAF7] hover:bg-[#F3F2F1] border border-[#DCD6CB] transition-colors cursor-pointer"
                   >
                     {loading === 'microsoft' ? (
                       <RefreshCw className="w-4 h-4 animate-spin text-[#0078D4]" />
@@ -447,7 +604,7 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
                       </svg>
                     )}
                     <div className="text-left flex-1">
-                      <div className="font-bold text-[13px]">Connexion Microsoft</div>
+                      <div className="font-bold text-xs">Connexion Microsoft</div>
                       <div className="text-[10px] text-[#7A756D]">Outlook, Hotmail, Office 365</div>
                     </div>
                   </button>
@@ -457,7 +614,7 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
                     id="menu-btn-google"
                     onClick={handleSignInGoogle}
                     disabled={loading !== null}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-[#5C574F] hover:bg-[#F4F1EA] transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-[#5C574F] hover:bg-[#F4F1EA] transition-colors cursor-pointer"
                   >
                     {loading === 'google' ? (
                       <RefreshCw className="w-4 h-4 animate-spin text-[#2D5A43]" />
@@ -470,7 +627,7 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
                       </svg>
                     )}
                     <div className="text-left flex-1">
-                      <div className="font-bold text-[13px]">Connexion Google</div>
+                      <div className="font-bold text-xs">Connexion Google</div>
                       <div className="text-[10px] text-[#7A756D]">Gmail & Google Workspace</div>
                     </div>
                   </button>

@@ -38,8 +38,9 @@ import {
 import confetti from 'canvas-confetti';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { SubscriptionPage } from './components/SubscriptionPage';
-import { UserSubscription, PaymentTransaction, PaymentConfig } from './types';
-import { fetchSubscriptionStatus, fetchPaymentConfig, verifyPayment } from './utils/subscriptionApi';
+import { PhoneAuthModal } from './components/PhoneAuthModal';
+import { UserSubscription, PaymentTransaction, PaymentConfig, PhoneAccount } from './types';
+import { fetchSubscriptionStatus, fetchPaymentConfig, verifyPayment, fetchPhoneAccount } from './utils/subscriptionApi';
 
 export default function App() {
   const [activePage, setActivePage] = useState<ActivePage>('dashboard');
@@ -50,12 +51,28 @@ export default function App() {
   const [activePrintJournal, setActivePrintJournal] = useState<DailyJournal | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Subscription state
+  // Phone Account & Subscription state
+  const [phoneAccount, setPhoneAccount] = useState<PhoneAccount | null>(null);
+  const [isPhoneAuthModalOpen, setIsPhoneAuthModalOpen] = useState<boolean>(false);
+  const [phoneAuthInitialMode, setPhoneAuthInitialMode] = useState<'register' | 'login'>('register');
+
   const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState<boolean>(false);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
   const [paymentBanner, setPaymentBanner] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  // Restore phone account from storage on load
+  useEffect(() => {
+    const savedUserId = localStorage.getItem('phone_user_id');
+    if (savedUserId) {
+      fetchPhoneAccount(savedUserId)
+        .then((acc) => {
+          if (acc) setPhoneAccount(acc);
+        })
+        .catch((e) => console.warn('Restore phone account error:', e));
+    }
+  }, []);
 
   // Listen to Auth state (Microsoft / Cloud)
   useEffect(() => {
@@ -73,6 +90,9 @@ export default function App() {
   }, []);
 
   const getEffectiveUserId = (): string => {
+    if (phoneAccount) return phoneAccount.userId;
+    const savedPhoneUserId = localStorage.getItem('phone_user_id');
+    if (savedPhoneUserId) return savedPhoneUserId;
     if (currentUser) return currentUser.uid;
     let localUid = localStorage.getItem('journal_local_uid');
     if (!localUid) {
@@ -91,6 +111,29 @@ export default function App() {
     } catch (err) {
       console.warn('Subscription fetch error:', err);
     }
+  };
+
+  const handleOpenPhoneAuthModal = (mode: 'register' | 'login' = 'register') => {
+    setPhoneAuthInitialMode(mode);
+    setIsPhoneAuthModalOpen(true);
+  };
+
+  const handlePhoneAuthSuccess = (account: PhoneAccount) => {
+    setPhoneAccount(account);
+    localStorage.setItem('phone_user_id', account.userId);
+    localStorage.setItem('user_contact_phone', account.displayPhone);
+    loadSubscriptionData();
+    confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    setPaymentBanner({
+      type: 'success',
+      message: `Bienvenue ${account.displayName} ! Votre compte a été configuré avec vos 7 jours d'essai gratuit.`
+    });
+  };
+
+  const handleLogoutPhoneAccount = () => {
+    localStorage.removeItem('phone_user_id');
+    setPhoneAccount(null);
+    loadSubscriptionData();
   };
 
   // Load payment config and subscription data
@@ -529,6 +572,10 @@ export default function App() {
         }}
         isPremium={isAccessAllowed}
         onOpenSubscribeModal={() => setIsSubscribeModalOpen(true)}
+        phoneAccount={phoneAccount}
+        subscription={subscription}
+        onOpenPhoneAuthModal={handleOpenPhoneAuthModal}
+        onLogoutPhoneAccount={handleLogoutPhoneAccount}
       />
 
       {/* Main Content Area */}
@@ -712,6 +759,9 @@ export default function App() {
               paymentConfig={paymentConfig}
               onOpenSubscribeModal={() => setIsSubscribeModalOpen(true)}
               onRefresh={loadSubscriptionData}
+              phoneAccount={phoneAccount}
+              onOpenPhoneAuthModal={handleOpenPhoneAuthModal}
+              onLogoutPhoneAccount={handleLogoutPhoneAccount}
             />
           </div>
         )}
@@ -749,6 +799,14 @@ export default function App() {
         onSubscriptionUpdated={() => {
           loadSubscriptionData();
         }}
+      />
+
+      {/* Phone Account Authentication Modal (7-day free trial on registration) */}
+      <PhoneAuthModal
+        isOpen={isPhoneAuthModalOpen}
+        onClose={() => setIsPhoneAuthModalOpen(false)}
+        initialMode={phoneAuthInitialMode}
+        onSuccess={handlePhoneAuthSuccess}
       />
 
     </div>

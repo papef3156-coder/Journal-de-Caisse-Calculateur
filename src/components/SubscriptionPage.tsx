@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { UserSubscription, PaymentTransaction, PaymentConfig } from '../types';
+import { UserSubscription, PaymentTransaction, PaymentConfig, PhoneAccount } from '../types';
 import { fetchPendingDeclarations, verifyDeclaration } from '../utils/subscriptionApi';
 import { 
   Crown, 
@@ -20,7 +20,12 @@ import {
   Smartphone,
   Phone,
   CheckCheck,
-  AlertCircle
+  AlertCircle,
+  Gift,
+  KeyRound,
+  Calendar,
+  LogOut,
+  Zap
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -32,6 +37,9 @@ interface SubscriptionPageProps {
   onOpenSubscribeModal: () => void;
   onRefresh: () => void;
   onOpenAuthModal?: () => void;
+  phoneAccount?: PhoneAccount | null;
+  onOpenPhoneAuthModal?: (mode: 'register' | 'login') => void;
+  onLogoutPhoneAccount?: () => void;
 }
 
 export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
@@ -41,7 +49,10 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
   paymentConfig,
   onOpenSubscribeModal,
   onRefresh,
-  onOpenAuthModal
+  onOpenAuthModal,
+  phoneAccount,
+  onOpenPhoneAuthModal,
+  onLogoutPhoneAccount
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'status' | 'history' | 'merchant_verification' | 'merchant_guide'>('status');
@@ -313,6 +324,96 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
       {activeTab === 'status' && (
         <div className="space-y-6">
           
+          {/* Phone Account Status Card */}
+          {phoneAccount ? (
+            <div className="bg-white border-2 border-[#2D5A43]/30 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#2D5A43] text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <Phone className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-base text-[#1A1A1A]">{phoneAccount.displayName}</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E7EFEA] text-[#2D5A43] border border-[#C3D9CD]">
+                      Compte Téléphone
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#5C574F] mt-0.5">
+                    <span className="font-mono font-bold text-[#1A1A1A]">{phoneAccount.displayPhone}</span>
+                    <span>•</span>
+                    <span>
+                      Expiration : <strong className="text-[#1A1A1A]">{subscription?.expiresAt ? new Date(subscription.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  type="button"
+                  id="btn-page-renew-phone-sub"
+                  onClick={onOpenSubscribeModal}
+                  className="px-4 py-2 bg-[#2D5A43] hover:bg-[#234735] text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                >
+                  <Zap className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Payer par Wave / Orange Money</span>
+                </button>
+                {onLogoutPhoneAccount && (
+                  <button
+                    type="button"
+                    onClick={onLogoutPhoneAccount}
+                    className="p-2 text-[#7A756D] hover:text-[#8B3A3A] hover:bg-[#FAF0F0] rounded-xl transition-colors cursor-pointer"
+                    title="Se déconnecter"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-r from-[#FAF3E8] to-[#F4F1EA] border border-[#E8D9C0] rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start space-x-4">
+                <div className="w-11 h-11 rounded-2xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#9C6B28] flex items-center justify-center shrink-0 mt-0.5">
+                  <Gift className="w-5 h-5 text-[#9C6B28]" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm sm:text-base text-[#1A1A1A]">
+                      Création de compte avec numéro de téléphone
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#D4AF37] text-[#1B382B]">
+                      7 JOURS GRATUITS
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#5C574F] max-w-xl">
+                    Inscrivez-vous simplement avec votre numéro (Wave ou Orange Money). Profitez de 7 jours offerts pour tester l’application, puis activez votre abonnement mensuel de 5 000 FCFA en un clic.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  id="btn-subpage-open-register"
+                  onClick={() => onOpenPhoneAuthModal?.('register')}
+                  className="px-4 py-2.5 bg-[#2D5A43] hover:bg-[#234735] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
+                >
+                  <Gift className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Créer mon compte (7j gratuits)</span>
+                </button>
+                <button
+                  type="button"
+                  id="btn-subpage-open-login"
+                  onClick={() => onOpenPhoneAuthModal?.('login')}
+                  className="px-3.5 py-2.5 bg-white hover:bg-[#FAF9F5] text-[#1A1A1A] border border-[#DCD6CB] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5"
+                >
+                  <KeyRound className="w-4 h-4 text-[#2D5A43]" />
+                  <span>Connexion</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Main Status Hero Card */}
           <div className="bg-[#FAFAF7] rounded-3xl border border-[#DCD6CB] p-6 sm:p-8 shadow-xs relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#2D5A43]/5 rounded-full blur-3xl pointer-events-none"></div>

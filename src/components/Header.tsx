@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivePage, AppSettings } from '../types';
+import { ActivePage, AppSettings, DailyJournal, PhoneAccount, UserSubscription } from '../types';
 import { 
   Calculator, 
   Settings as SettingsIcon, 
@@ -10,11 +10,11 @@ import {
   TrendingUp,
   BookOpen,
   ExternalLink,
-  Camera
+  Camera,
+  Crown
 } from 'lucide-react';
 import { MicrosoftAuthButton } from './MicrosoftAuthButton';
 import { User } from 'firebase/auth';
-import { DailyJournal } from '../types';
 import defaultStoreLogo from '../assets/images/store_profile_logo_1788716413614.jpg';
 
 interface HeaderProps {
@@ -28,6 +28,10 @@ interface HeaderProps {
   onJournalsLoadedFromCloud: (journals: DailyJournal[]) => void;
   isPremium?: boolean;
   onOpenSubscribeModal: () => void;
+  phoneAccount?: PhoneAccount | null;
+  subscription?: UserSubscription | null;
+  onOpenPhoneAuthModal?: (mode: 'register' | 'login') => void;
+  onLogoutPhoneAccount?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -40,7 +44,11 @@ export const Header: React.FC<HeaderProps> = ({
   journals,
   onJournalsLoadedFromCloud,
   isPremium,
-  onOpenSubscribeModal
+  onOpenSubscribeModal,
+  phoneAccount,
+  subscription,
+  onOpenPhoneAuthModal,
+  onLogoutPhoneAccount
 }) => {
   const [profileLogo, setProfileLogo] = React.useState<string>(() => {
     return localStorage.getItem('app_custom_profile_logo') || defaultStoreLogo;
@@ -177,6 +185,32 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               <button
+                id="nav-btn-subscription"
+                onClick={() => setActivePage('subscription')}
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  activePage === 'subscription'
+                    ? 'bg-[#FAFAF7] text-[#2D5A43] shadow-xs border border-[#DCD6CB]'
+                    : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
+                }`}
+              >
+                <Crown className="w-4 h-4 text-[#D4AF37] shrink-0" />
+                <span>Abonnement</span>
+                {subscription?.status === 'active' ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#E7EFEA] text-[#2D5A43] border border-[#C3D9CD] ml-0.5">
+                    Actif
+                  </span>
+                ) : subscription?.status === 'trial' ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#FAF3E8] text-[#9C6B28] border border-[#E8D9C0] ml-0.5">
+                    {subscription.trialDaysRemaining ?? 7}j gratuit
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#FAF0F0] text-[#8B3A3A] border border-[#8B3A3A]/30 ml-0.5">
+                    Expiré
+                  </span>
+                )}
+              </button>
+
+              <button
                 id="nav-btn-settings"
                 onClick={() => setActivePage('settings')}
                 className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
@@ -194,6 +228,11 @@ export const Header: React.FC<HeaderProps> = ({
               user={user}
               journals={journals}
               onJournalsLoadedFromCloud={onJournalsLoadedFromCloud}
+              phoneAccount={phoneAccount}
+              subscription={subscription}
+              onOpenPhoneAuthModal={onOpenPhoneAuthModal}
+              onOpenSubscribeModal={onOpenSubscribeModal}
+              onLogoutPhoneAccount={onLogoutPhoneAccount}
             />
 
             {/* If in iframe (e.g. preview mode), show new tab button */}

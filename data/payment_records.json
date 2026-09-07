@@ -26,6 +26,49 @@
       "paymentMethod": "wave",
       "lastTransactionId": "tx_1788638073064_8hqgk",
       "updatedAt": "2026-09-05T19:54:36.595Z"
+    },
+    "usr_1788636519172_5fzj8": {
+      "userId": "usr_1788636519172_5fzj8",
+      "status": "trial",
+      "plan": "trial",
+      "amount": 0,
+      "currency": "FCFA",
+      "trialStartDate": "2026-09-07T16:04:02.382Z",
+      "trialEndDate": "2026-09-14T16:04:02.382Z",
+      "trialUsed": true,
+      "trialDaysRemaining": 7,
+      "startDate": "2026-09-07T16:04:02.382Z",
+      "endDate": "2026-09-14T16:04:02.382Z",
+      "updatedAt": "2026-09-07T16:04:02.382Z"
+    },
+    "8mfsuXnfX0WIOne7yRCoq6TEuAE3": {
+      "userId": "8mfsuXnfX0WIOne7yRCoq6TEuAE3",
+      "status": "trial",
+      "plan": "trial",
+      "amount": 0,
+      "currency": "FCFA",
+      "trialStartDate": "2026-09-07T16:04:03.293Z",
+      "trialEndDate": "2026-09-14T16:04:03.293Z",
+      "trialUsed": true,
+      "trialDaysRemaining": 7,
+      "startDate": "2026-09-07T16:04:03.293Z",
+      "endDate": "2026-09-14T16:04:03.293Z",
+      "updatedAt": "2026-09-07T16:04:03.293Z"
+    },
+    "phone_221771239988": {
+      "userId": "phone_221771239988",
+      "status": "active",
+      "plan": "premium_monthly",
+      "amount": 5000,
+      "currency": "XOF",
+      "startDate": "2026-09-07T16:57:31.435Z",
+      "endDate": "2026-10-07T16:57:31.435Z",
+      "trialUsed": true,
+      "trialStartDate": "2026-09-07T16:57:26.696Z",
+      "trialEndDate": "2026-09-14T16:57:26.696Z",
+      "paymentMethod": "wave",
+      "lastTransactionId": "tx_1788800251434_xepp5",
+      "updatedAt": "2026-09-07T16:57:31.435Z"
     }
   },
   "transactions": {
@@ -93,6 +136,33 @@
       "verifiedBy": "Vérificateur",
       "verificationNote": "Transfert vérifié sur le 78 968 16 83",
       "completedAt": "2026-09-05T19:54:36.595Z"
+    },
+    "tx_1788800251434_xepp5": {
+      "id": "tx_1788800251434_xepp5",
+      "userId": "phone_221771239988",
+      "phoneNumber": "+221771239988",
+      "amount": 5000,
+      "currency": "XOF",
+      "paymentMethod": "wave",
+      "senderPhone": "+221 77 123 99 88",
+      "targetPhone": "78 968 16 83",
+      "paymentReference": "WAVE_TEST_771239988",
+      "verificationNote": "Paiement Wave confirmé automatiquement",
+      "status": "completed",
+      "createdAt": "2026-09-07T16:57:31.434Z",
+      "isCredited": true,
+      "completedAt": "2026-09-07T16:57:31.435Z"
+    }
+  },
+  "users": {
+    "phone_221771239988": {
+      "id": "phone_221771239988",
+      "phoneNumber": "+221771239988",
+      "displayPhone": "+221 77 123 99 88",
+      "displayName": "Boutique Test Dakar",
+      "pin": "1234",
+      "createdAt": "2026-09-07T16:57:26.695Z",
+      "lastLoginAt": "2026-09-07T16:57:28.770Z"
     }
   }
 }

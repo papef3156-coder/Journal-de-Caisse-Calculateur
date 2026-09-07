@@ -80,9 +80,20 @@ export interface AppSettings {
 export type ActivePage = 'journal' | 'history' | 'gains_summary' | 'settings' | 'dashboard' | 'subscription';
 export type TimePeriod = 'today' | '7days' | 'month' | 'year' | 'all';
 
+export interface PhoneAccount {
+  id: string;
+  userId: string;
+  phoneNumber: string;
+  displayPhone: string;
+  displayName: string;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
 export interface UserSubscription {
   userId: string;
   userEmail?: string;
+  phoneNumber?: string;
   status: 'trial' | 'active' | 'expired';
   plan: 'premium_monthly' | 'trial' | 'free';
   amount: number;
@@ -161,4 +172,5 @@ export interface MonthlyProfitRecord {
   lastAutoSaved: string;   // Horodatage ISO du dernier enregistrement automatique
   status: 'en_cours' | 'cloture_auto';
 }
+
 

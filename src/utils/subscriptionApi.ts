@@ -1,9 +1,23 @@
-import { UserSubscription, PaymentTransaction, PaymentConfig } from '../types';
+import { UserSubscription, PaymentTransaction, PaymentConfig, PhoneAccount } from '../types';
 
 export interface SubscriptionStatusResponse {
   isPremium: boolean;
   subscription: UserSubscription;
   transactions: PaymentTransaction[];
+}
+
+export interface AuthPhoneResponse {
+  success: boolean;
+  message: string;
+  user: PhoneAccount;
+  subscription: UserSubscription;
+}
+
+export interface PayWithPhoneResponse {
+  success: boolean;
+  message: string;
+  subscription: UserSubscription;
+  transaction: PaymentTransaction;
 }
 
 export interface CheckoutResponse {
@@ -174,3 +188,80 @@ export async function triggerSandboxSimulation(
   }
   return data;
 }
+
+/**
+ * Register account with phone number and PIN (grants 7-day free trial)
+ */
+export async function registerPhoneAccount(
+  phoneNumber: string,
+  pin: string,
+  displayName?: string
+): Promise<AuthPhoneResponse> {
+  const response = await fetch('/api/subscription/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phoneNumber, pin, displayName })
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Erreur lors de la création du compte');
+  }
+  return data;
+}
+
+/**
+ * Login with phone number and PIN
+ */
+export async function loginPhoneAccount(
+  phoneNumber: string,
+  pin: string
+): Promise<AuthPhoneResponse> {
+  const response = await fetch('/api/subscription/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phoneNumber, pin })
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Erreur lors de la connexion');
+  }
+  return data;
+}
+
+/**
+ * Fetch current phone account details and subscription
+ */
+export async function fetchPhoneAccount(userId: string): Promise<{ user: PhoneAccount | null; subscription: UserSubscription }> {
+  const response = await fetch(`/api/subscription/auth/me?userId=${encodeURIComponent(userId)}`);
+  if (!response.ok) {
+    throw new Error('Impossible de charger les données du compte');
+  }
+  return response.json();
+}
+
+/**
+ * Pay with Wave or Orange Money using phone number
+ * Automatically activates 1-month Premium subscription upon confirmation
+ */
+export async function payWithPhone(params: {
+  userId: string;
+  phoneNumber: string;
+  provider: 'wave' | 'orange_money';
+  paymentReference?: string;
+  notes?: string;
+}): Promise<PayWithPhoneResponse> {
+  const response = await fetch('/api/subscription/pay-with-phone', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Erreur lors de l'activation du paiement");
+  }
+  return data;
+}
+

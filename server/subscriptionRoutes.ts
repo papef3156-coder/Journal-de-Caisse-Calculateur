@@ -9,7 +9,12 @@ import {
   getTransactionByProviderRef,
   getPendingVerificationTransactions,
   verifyAndApproveManualPayment,
-  rejectManualPayment
+  rejectManualPayment,
+  registerPhoneUser,
+  loginPhoneUser,
+  getPhoneUser,
+  activateAutomaticPhonePayment,
+  normalizePhoneNumber
 } from './db';
 import { 
   createWaveCheckoutSession, 
@@ -100,6 +105,148 @@ subscriptionRouter.get('/status', (req: Request, res: Response) => {
     transactions
   });
 });
+
+/**
+ * POST /api/subscription/auth/register
+ * Create an account using a phone number with automatic 7-day free trial.
+ */
+subscriptionRouter.post('/auth/register', (req: Request, res: Response) => {
+  try {
+    const { phoneNumber, pin, displayName } = req.body;
+
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      return res.status(400).json({ error: "Le numéro de téléphone est obligatoire." });
+    }
+
+    if (!pin || typeof pin !== 'string' || pin.trim().length < 4) {
+      return res.status(400).json({ error: "Le code PIN secret doit comporter au moins 4 chiffres." });
+    }
+
+    const result = registerPhoneUser(phoneNumber, pin, displayName);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      message: "Compte créé avec succès ! Vous bénéficiez de 7 jours d'essai gratuit.",
+      user: result.user ? { ...result.user, userId: result.user.id } : undefined,
+      subscription: result.subscription
+    });
+  } catch (error: any) {
+    console.error('[Auth Register Error]', error);
+    res.status(500).json({ error: `Erreur serveur : ${error.message}` });
+  }
+});
+
+/**
+ * POST /api/subscription/auth/login
+ * Log in using phone number and PIN.
+ */
+subscriptionRouter.post('/auth/login', (req: Request, res: Response) => {
+  try {
+    const { phoneNumber, pin } = req.body;
+
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      return res.status(400).json({ error: "Le numéro de téléphone est obligatoire." });
+    }
+
+    if (!pin || typeof pin !== 'string') {
+      return res.status(400).json({ error: "Le code PIN est obligatoire." });
+    }
+
+    const result = loginPhoneUser(phoneNumber, pin);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      message: "Connexion réussie.",
+      user: result.user ? { ...result.user, userId: result.user.id } : undefined,
+      subscription: result.subscription
+    });
+  } catch (error: any) {
+    console.error('[Auth Login Error]', error);
+    res.status(500).json({ error: `Erreur serveur : ${error.message}` });
+  }
+});
+
+/**
+ * GET /api/subscription/auth/me
+ * Get current phone user account and subscription status.
+ */
+subscriptionRouter.get('/auth/me', (req: Request, res: Response) => {
+  try {
+    const userId = req.query.userId as string;
+
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: "Identifiant userId manquant." });
+    }
+
+    const user = getPhoneUser(userId.trim());
+    const subscription = getUserSubscription(userId.trim());
+
+    res.json({
+      user: user ? { ...user, userId: user.id } : null,
+      subscription
+    });
+  } catch (error: any) {
+    console.error('[Auth Me Error]', error);
+    res.status(500).json({ error: `Erreur serveur : ${error.message}` });
+  }
+});
+
+/**
+ * POST /api/subscription/pay-with-phone
+ * Pay via Wave or Orange Money using user phone number.
+ * Automatically activates 1-month (30-day) Premium subscription upon confirmation.
+ */
+subscriptionRouter.post('/pay-with-phone', async (req: Request, res: Response) => {
+  try {
+    const { userId, phoneNumber, provider, paymentReference, notes } = req.body;
+
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: "Identifiant utilisateur (userId) manquant." });
+    }
+
+    if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim().length < 7) {
+      return res.status(400).json({ error: "Veuillez renseigner votre numéro de téléphone (ex: 77 123 45 67)." });
+    }
+
+    if (provider !== 'wave' && provider !== 'orange_money') {
+      return res.status(400).json({ error: "Moyen de paiement invalide. Choisissez 'wave' ou 'orange_money'." });
+    }
+
+    // Automatically activate subscription for 1 month
+    const result = activateAutomaticPhonePayment({
+      userId: userId.trim(),
+      phoneNumber: phoneNumber.trim(),
+      provider,
+      amount: SUBSCRIPTION_PRICE,
+      paymentReference,
+      notes
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const providerLabel = provider === 'wave' ? 'Wave' : 'Orange Money';
+    res.json({
+      success: true,
+      message: `Paiement ${providerLabel} validé avec succès ! Votre abonnement Premium de 5 000 FCFA est automatiquement activé pour 1 mois (30 jours).`,
+      subscription: result.subscription,
+      transaction: result.transaction
+    });
+  } catch (error: any) {
+    console.error('[Pay With Phone Error]', error);
+    res.status(500).json({ error: `Erreur serveur lors de l'activation : ${error.message}` });
+  }
+});
+
 
 /**
  * POST /api/subscription/declare-payment

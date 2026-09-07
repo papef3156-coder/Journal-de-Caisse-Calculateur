@@ -1,9 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 
+export interface PhoneUser {
+  id: string; // e.g., phone_221771234567
+  phoneNumber: string; // normalized international format: +221771234567
+  displayPhone: string; // user-friendly format: +221 77 123 45 67
+  displayName: string;
+  pin: string; // 4 to 6 digit secret PIN
+  createdAt: string;
+  lastLoginAt: string;
+}
+
 export interface StoredSubscription {
   userId: string;
   userEmail?: string;
+  phoneNumber?: string;
   status: 'trial' | 'active' | 'expired';
   plan: 'premium_monthly' | 'trial';
   amount: number;
@@ -25,6 +36,7 @@ export interface StoredTransaction {
   id: string;
   userId: string;
   userEmail?: string;
+  phoneNumber?: string;
   amount: number;
   currency: string;
   paymentMethod: 'wave' | 'orange_money' | 'wave_om' | string;
@@ -45,6 +57,7 @@ export interface StoredTransaction {
 interface DatabaseSchema {
   subscriptions: Record<string, StoredSubscription>; // keyed by userId
   transactions: Record<string, StoredTransaction>;    // keyed by transactionId
+  users?: Record<string, PhoneUser>;                 // keyed by userId (phone_...)
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -58,7 +71,8 @@ function ensureDbFile(): void {
   if (!fs.existsSync(DB_FILE)) {
     const initial: DatabaseSchema = {
       subscriptions: {},
-      transactions: {}
+      transactions: {},
+      users: {}
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8');
   }
@@ -68,10 +82,14 @@ function readDb(): DatabaseSchema {
   ensureDbFile();
   try {
     const content = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(content) as DatabaseSchema;
+    const parsed = JSON.parse(content) as DatabaseSchema;
+    if (!parsed.users) parsed.users = {};
+    if (!parsed.subscriptions) parsed.subscriptions = {};
+    if (!parsed.transactions) parsed.transactions = {};
+    return parsed;
   } catch (err) {
     console.error('[DB] Error reading database file:', err);
-    return { subscriptions: {}, transactions: {} };
+    return { subscriptions: {}, transactions: {}, users: {} };
   }
 }
 
@@ -362,3 +380,201 @@ export function rejectManualPayment(
 
   return { success: true, transaction: tx };
 }
+
+/**
+ * Clean and normalize phone numbers (supports Senegal +221, Côte d'Ivoire +225, Mali +223, etc.)
+ */
+export function normalizePhoneNumber(rawPhone: string): { normalized: string; display: string } {
+  if (!rawPhone) return { normalized: '', display: '' };
+  
+  // Remove spaces, tabs, dashes, dots, parentheses
+  let cleaned = rawPhone.replace(/[\s\-\.\(\)]/g, '');
+
+  if (cleaned.startsWith('00')) {
+    cleaned = '+' + cleaned.substring(2);
+  }
+
+  // If 9 digits starting with 70, 75, 76, 77, 78 (Senegal local format e.g. 771234567)
+  if (/^[7][05678]\d{7}$/.test(cleaned)) {
+    cleaned = '+221' + cleaned;
+  } else if (!cleaned.startsWith('+')) {
+    // If entered without +, prefix with + if standard
+    cleaned = '+' + cleaned;
+  }
+
+  // Format display string
+  let display = cleaned;
+  if (cleaned.startsWith('+221') && cleaned.length === 13) {
+    // +221 77 123 45 67
+    display = `${cleaned.substring(0, 4)} ${cleaned.substring(4, 6)} ${cleaned.substring(6, 9)} ${cleaned.substring(9, 11)} ${cleaned.substring(11, 13)}`;
+  }
+
+  return { normalized: cleaned, display };
+}
+
+/**
+ * Register a new user with their phone number and 4-6 digit PIN.
+ * Grants an automatic 7-day free trial on creation.
+ */
+export function registerPhoneUser(
+  rawPhone: string,
+  pin: string,
+  displayName?: string
+): { success: boolean; user?: Omit<PhoneUser, 'pin'>; subscription?: StoredSubscription; error?: string } {
+  const { normalized, display } = normalizePhoneNumber(rawPhone);
+
+  if (!normalized || normalized.length < 9) {
+    return { success: false, error: "Veuillez renseigner un numéro de téléphone valide (ex: 77 123 45 67 ou +221...)." };
+  }
+
+  if (!pin || pin.trim().length < 4) {
+    return { success: false, error: "Le code PIN secret doit comporter au moins 4 chiffres." };
+  }
+
+  const db = readDb();
+  if (!db.users) db.users = {};
+
+  const userId = `phone_${normalized.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+  // Check if user already exists
+  if (db.users[userId]) {
+    return { 
+      success: false, 
+      error: `Un compte existe déjà pour le numéro ${display}. Veuillez choisir "Se connecter" ou saisir votre code PIN.` 
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newUser: PhoneUser = {
+    id: userId,
+    phoneNumber: normalized,
+    displayPhone: display,
+    displayName: displayName?.trim() || `Commerçant (${display})`,
+    pin: pin.trim(),
+    createdAt: now,
+    lastLoginAt: now
+  };
+
+  db.users[userId] = newUser;
+  writeDb(db);
+
+  // Initialize 7-day free trial on first registration
+  const subscription = getUserSubscription(userId, normalized);
+
+  const { pin: _p, ...safeUser } = newUser;
+  return {
+    success: true,
+    user: safeUser,
+    subscription
+  };
+}
+
+/**
+ * Login user using their phone number and PIN
+ */
+export function loginPhoneUser(
+  rawPhone: string,
+  pin: string
+): { success: boolean; user?: Omit<PhoneUser, 'pin'>; subscription?: StoredSubscription; error?: string } {
+  const { normalized, display } = normalizePhoneNumber(rawPhone);
+
+  if (!normalized || normalized.length < 9) {
+    return { success: false, error: "Veuillez renseigner un numéro de téléphone valide." };
+  }
+
+  if (!pin) {
+    return { success: false, error: "Veuillez renseigner votre code PIN." };
+  }
+
+  const db = readDb();
+  if (!db.users) db.users = {};
+
+  const userId = `phone_${normalized.replace(/[^a-zA-Z0-9]/g, '')}`;
+  const user = db.users[userId];
+
+  if (!user) {
+    return { 
+      success: false, 
+      error: `Aucun compte trouvé pour le numéro ${display}. Veuillez créer un compte (7 jours gratuits offerts).` 
+    };
+  }
+
+  if (user.pin !== pin.trim()) {
+    return { success: false, error: "Code PIN incorrect. Veuillez vérifier vos chiffres." };
+  }
+
+  // Update last login
+  user.lastLoginAt = new Date().toISOString();
+  db.users[userId] = user;
+  writeDb(db);
+
+  const subscription = getUserSubscription(userId, user.phoneNumber);
+  const { pin: _p, ...safeUser } = user;
+
+  return {
+    success: true,
+    user: safeUser,
+    subscription
+  };
+}
+
+/**
+ * Get Phone User details without sensitive PIN
+ */
+export function getPhoneUser(userId: string): Omit<PhoneUser, 'pin'> | null {
+  const db = readDb();
+  const user = db.users?.[userId];
+  if (!user) return null;
+  const { pin: _p, ...safeUser } = user;
+  return safeUser;
+}
+
+/**
+ * Automatic subscription activation via Phone payment (Wave or Orange Money)
+ * Automatically activates 1 month (30 days) of Premium subscription
+ */
+export function activateAutomaticPhonePayment(params: {
+  userId: string;
+  phoneNumber: string;
+  provider: 'wave' | 'orange_money';
+  amount?: number;
+  paymentReference?: string;
+  notes?: string;
+}): { success: boolean; subscription?: StoredSubscription; transaction?: StoredTransaction; error?: string } {
+  const { userId, phoneNumber, provider, amount = 5000, paymentReference, notes } = params;
+
+  if (!userId) {
+    return { success: false, error: "Identifiant utilisateur requis." };
+  }
+
+  const { normalized, display } = normalizePhoneNumber(phoneNumber);
+  const transactionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Create completed transaction
+  const tx = createTransaction({
+    id: transactionId,
+    userId: userId.trim(),
+    phoneNumber: normalized || phoneNumber,
+    amount,
+    currency: 'XOF',
+    paymentMethod: provider,
+    senderPhone: display || phoneNumber,
+    targetPhone: '78 968 16 83',
+    paymentReference: paymentReference || `AUTO-${provider.toUpperCase()}-${Date.now().toString().slice(-6)}`,
+    verificationNote: notes || `Paiement ${provider === 'wave' ? 'Wave' : 'Orange Money'} confirmé automatiquement`,
+    status: 'completed'
+  });
+
+  // Activate 30-day subscription
+  const activation = activateSubscriptionForTransaction(transactionId);
+  if (!activation.success) {
+    return { success: false, error: activation.error };
+  }
+
+  return {
+    success: true,
+    subscription: activation.subscription,
+    transaction: getTransaction(transactionId) || tx
+  };
+}
+
