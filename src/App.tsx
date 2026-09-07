@@ -40,6 +40,7 @@ import { SubscriptionModal } from './components/SubscriptionModal';
 import { SubscriptionPage } from './components/SubscriptionPage';
 import { UserSubscription, PaymentTransaction, PaymentConfig } from './types';
 import { fetchSubscriptionStatus, fetchPaymentConfig, verifyPayment } from './utils/subscriptionApi';
+import { trackPageView } from './utils/analytics';
 
 export default function App() {
   const [activePage, setActivePage] = useState<ActivePage>('dashboard');
@@ -71,6 +72,19 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Track page views in Google Analytics 4 (compatible with SPA navigation on GitHub Pages)
+  useEffect(() => {
+    const pageTitles: Record<ActivePage, string> = {
+      dashboard: 'Tableau de bord - Journal de Caisse',
+      journal: 'Saisie Journal - Journal de Caisse',
+      history: 'Historique des Journaux - Journal de Caisse',
+      gains_summary: 'Synthèse & Calculateur de Gains - Journal de Caisse',
+      settings: 'Paramètres - Journal de Caisse',
+      subscription: 'Abonnement & Licence - Journal de Caisse',
+    };
+    trackPageView(`/${activePage}`, pageTitles[activePage] || `Journal de Caisse - ${activePage}`);
+  }, [activePage]);
 
   const getEffectiveUserId = (): string => {
     if (currentUser) return currentUser.uid;
