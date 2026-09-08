@@ -89,6 +89,26 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Global Escape (Échap) key handler: closes receipt/auth/subscription modals or returns to journal page
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (activePrintJournal) {
+          setActivePrintJournal(null);
+        } else if (isSubscribeModalOpen) {
+          setIsSubscribeModalOpen(false);
+        } else if (isPhoneAuthModalOpen) {
+          setIsPhoneAuthModalOpen(false);
+        } else if (activePage !== 'journal' && activePage !== 'dashboard') {
+          setActivePage('journal');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [activePrintJournal, isSubscribeModalOpen, isPhoneAuthModalOpen, activePage]);
+
   const getEffectiveUserId = (): string => {
     if (phoneAccount) return phoneAccount.userId;
     const savedPhoneUserId = localStorage.getItem('phone_user_id');
@@ -712,6 +732,11 @@ export default function App() {
               onDeleteJournal={handleDeleteJournal}
               onDeleteMultipleJournals={handleDeleteMultipleJournals}
               onPrintJournal={(j) => setActivePrintJournal(j)}
+              onSaveJournal={handleSaveJournal}
+              onBackToEditor={() => {
+                setActivePage('journal');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           </div>
         )}

@@ -10,8 +10,7 @@ import {
   TrendingUp,
   BookOpen,
   ExternalLink,
-  Camera,
-  Crown
+  Camera
 } from 'lucide-react';
 import { MicrosoftAuthButton } from './MicrosoftAuthButton';
 import { User } from 'firebase/auth';
@@ -182,32 +181,6 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <TrendingUp className="w-4 h-4 text-[#2D5A43] shrink-0" />
                 <span>Gains & Analyses</span>
-              </button>
-
-              <button
-                id="nav-btn-subscription"
-                onClick={() => setActivePage('subscription')}
-                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  activePage === 'subscription'
-                    ? 'bg-[#FAFAF7] text-[#2D5A43] shadow-xs border border-[#DCD6CB]'
-                    : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
-                }`}
-              >
-                <Crown className="w-4 h-4 text-[#D4AF37] shrink-0" />
-                <span>Abonnement</span>
-                {subscription?.status === 'active' ? (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#E7EFEA] text-[#2D5A43] border border-[#C3D9CD] ml-0.5">
-                    Actif
-                  </span>
-                ) : subscription?.status === 'trial' ? (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#FAF3E8] text-[#9C6B28] border border-[#E8D9C0] ml-0.5">
-                    {subscription.trialDaysRemaining ?? 7}j gratuit
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#FAF0F0] text-[#8B3A3A] border border-[#8B3A3A]/30 ml-0.5">
-                    Expiré
-                  </span>
-                )}
               </button>
 
               <button

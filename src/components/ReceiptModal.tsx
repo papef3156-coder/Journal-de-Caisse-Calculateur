@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppSettings, DailyJournal } from '../types';
 import { formatCurrency, formatNumber, formatDateFrench, calculateJournalSummary } from '../utils/calculations';
 import { formatFrenchDateTime } from '../utils/dateTime';
-import { X, Printer, CheckCircle, Store, Calendar, FileText } from 'lucide-react';
+import { X, Printer, CheckCircle, Store, Calendar, FileText, ArrowLeft } from 'lucide-react';
 
 interface ReceiptModalProps {
   journal: DailyJournal | null;
@@ -15,6 +15,16 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   settings,
   onClose,
 }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!journal) return null;
 
   const summary = journal.summary || calculateJournalSummary(
@@ -31,10 +41,16 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#1F1E1C]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 bg-[#1F1E1C]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
+      onClick={onClose}
+    >
       
       {/* Modal Card */}
-      <div className="bg-[#FAFAF7] rounded-2xl shadow-2xl max-w-2xl w-full border border-[#DCD6CB] overflow-hidden my-8">
+      <div
+        className="bg-[#FAFAF7] rounded-2xl shadow-2xl max-w-2xl w-full border border-[#DCD6CB] overflow-hidden my-8 cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Modal Controls Bar (Hidden during print) */}
         <div className="p-4 bg-[#EBE8E0] border-b border-[#DCD6CB] flex items-center justify-between print:hidden">
@@ -47,14 +63,26 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           <div className="flex items-center space-x-2">
             <button
               onClick={handlePrint}
-              className="flex items-center space-x-1.5 bg-[#2D5A43] hover:bg-[#234735] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors"
+              className="flex items-center space-x-1.5 bg-[#2D5A43] hover:bg-[#234735] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimer la Fiche</span>
+              <span>Imprimer</span>
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-[#5C574F] hover:text-[#1A1A1A] rounded-lg hover:bg-[#DCD6CB]"
+              id="btn-receipt-close-esc"
+              title="Retourner à la page (Touche Échap / Esc)"
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-white hover:bg-[#DCD6CB] text-[#5C574F] hover:text-[#1A1A1A] border border-[#DCD6CB] rounded-lg text-xs font-medium transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Retour</span>
+              <kbd className="text-[10px] font-mono bg-[#EBE8E0] px-1 py-0.5 rounded text-[#7A756D] border border-[#DCD6CB] font-bold">Esc</kbd>
+            </button>
+            <button
+              onClick={onClose}
+              aria-label="Fermer"
+              title="Fermer (Échap)"
+              className="p-1.5 text-[#5C574F] hover:text-[#1A1A1A] rounded-lg hover:bg-[#DCD6CB] transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -195,6 +223,24 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             Ticket de caisse généré et horodaté automatiquement le {formatFrenchDateTime(new Date())}
           </p>
 
+        </div>
+
+        {/* Modal Bottom Bar (Hidden during print) */}
+        <div className="p-3.5 bg-[#EBE8E0] border-t border-[#DCD6CB] flex flex-col sm:flex-row items-center justify-between gap-2.5 print:hidden">
+          <span className="text-[#7A756D] font-editorial text-xs flex items-center gap-1.5">
+            <span>Raccourci clavier : appuyez sur</span>
+            <kbd className="font-mono bg-white border border-[#DCD6CB] px-1.5 py-0.5 rounded text-[#2D5A43] font-bold text-[11px] shadow-2xs">Échap (Esc)</kbd>
+            <span>pour fermer</span>
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            id="btn-receipt-bottom-return"
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-white hover:bg-[#DCD6CB] text-[#2D5A43] font-bold rounded-xl border border-[#DCD6CB] text-xs transition-colors cursor-pointer shadow-2xs"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Retourner à la page</span>
+          </button>
         </div>
 
       </div>

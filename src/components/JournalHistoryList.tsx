@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DailyJournal } from '../types';
 import { formatCurrency, formatNumber, formatDateFrench } from '../utils/calculations';
 import { getLocalDateString } from '../utils/dateTime';
@@ -12,7 +12,9 @@ import {
   Square,
   TrendingUp,
   AlertTriangle,
-  RotateCcw
+  ArrowLeft,
+  Check,
+  X
 } from 'lucide-react';
 
 interface JournalHistoryListProps {
@@ -23,6 +25,8 @@ interface JournalHistoryListProps {
   onDeleteJournal: (id: string) => void;
   onDeleteMultipleJournals?: (ids: string[]) => void;
   onPrintJournal: (journal: DailyJournal) => void;
+  onSaveJournal?: (journal: DailyJournal) => void;
+  onBackToEditor?: () => void;
 }
 
 export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
@@ -33,6 +37,8 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
   onDeleteJournal,
   onDeleteMultipleJournals,
   onPrintJournal,
+  onSaveJournal,
+  onBackToEditor,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -41,6 +47,23 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
   const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const todayStr = getLocalDateString();
+
+  // Handle Escape key: close modals or return to editor
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (journalToDelete) {
+          setJournalToDelete(null);
+        } else if (showBatchDeleteModal) {
+          setShowBatchDeleteModal(false);
+        } else if (onBackToEditor) {
+          onBackToEditor();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [journalToDelete, showBatchDeleteModal, onBackToEditor]);
 
   // Extract unique months from journals
   const availableMonths = Array.from(
@@ -121,14 +144,29 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
       
       {/* Header & Quick stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#EBE8E0]">
-        <div>
-          <h3 className="font-bold text-[#1A1A1A] font-editorial text-lg flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-[#2D5A43]" />
-            <span>Historique des Journaux Enregistrés</span>
-          </h3>
-          <p className="text-xs text-[#7A756D] font-editorial italic mt-0.5">
-            {journals.length} {journals.length > 1 ? 'journaux de caisse archivés' : 'journal de caisse archivé'} au total
-          </p>
+        <div className="flex items-center gap-3">
+          {onBackToEditor && (
+            <button
+              type="button"
+              onClick={onBackToEditor}
+              id="btn-history-back-to-editor"
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-[#EBE8E0] text-[#2D5A43] border border-[#DCD6CB] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0"
+              title="Retourner à la saisie du journal de caisse (Touche Échap / Esc)"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Retour au journal</span>
+              <kbd className="text-[10px] font-mono bg-[#FAFAF7] border border-[#DCD6CB] px-1.5 py-0.5 rounded text-[#7A756D] font-bold shadow-2xs">Esc</kbd>
+            </button>
+          )}
+          <div>
+            <h3 className="font-bold text-[#1A1A1A] font-editorial text-lg flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-[#2D5A43]" />
+              <span>Historique des Journaux Enregistrés</span>
+            </h3>
+            <p className="text-xs text-[#7A756D] font-editorial italic mt-0.5">
+              {journals.length} {journals.length > 1 ? 'journaux de caisse archivés' : 'journal de caisse archivé'} au total
+            </p>
+          </div>
         </div>
 
         {/* Batch action buttons if selected */}
