@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { ActivePage, AppSettings, DailyJournal, TimePeriod, SellerEntry } from './types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ActivePage, AppSettings, DailyJournal, TimePeriod, SellerEntry, BakeryBranch } from './types';
 import { 
   loadJournals, 
   loadSettings, 
   saveJournals, 
   saveSettings, 
   DEFAULT_SETTINGS, 
-  getInitialSellers 
+  getInitialSellers,
+  loadBakeries,
+  saveBakeries,
+  loadActiveBakeryId,
+  saveActiveBakeryId
 } from './utils/storage';
 import { calculateJournalSummary } from './utils/calculations';
 import { getLocalDateString, useLiveDateTime } from './utils/dateTime';
@@ -18,6 +22,7 @@ import { JournalHistoryList } from './components/JournalHistoryList';
 import { GainsAndSummaryPage } from './components/GainsAndSummaryPage';
 import { SettingsPage } from './components/SettingsPage';
 import { ReceiptModal } from './components/ReceiptModal';
+import { AddBakeryModal } from './components/AddBakeryModal';
 import { autoSaveMonthlyProfitRecords } from './utils/monthlyRecords';
 import { auth, saveJournalToCloud, saveSettingsToCloud, deleteJournalFromCloud, loadJournalsFromCloud } from './utils/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -47,6 +52,9 @@ export default function App() {
   const [dashboardTab, setDashboardTab] = useState<'editor' | 'charts' | 'history'>('editor');
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [journals, setJournals] = useState<DailyJournal[]>(loadJournals);
+  const [bakeries, setBakeries] = useState<BakeryBranch[]>(loadBakeries);
+  const [activeBakeryId, setActiveBakeryId] = useState<string>(loadActiveBakeryId);
+  const [isAddBakeryModalOpen, setIsAddBakeryModalOpen] = useState<boolean>(false);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('7days');
   const [activePrintJournal, setActivePrintJournal] = useState<DailyJournal | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -89,12 +97,14 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Global Escape (Échap) key handler: closes receipt/auth/subscription modals or returns to journal page
+  // Global Escape (Échap) key handler: closes receipt/bakery/auth/subscription modals or returns to journal page
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (activePrintJournal) {
           setActivePrintJournal(null);
+        } else if (isAddBakeryModalOpen) {
+          setIsAddBakeryModalOpen(false);
         } else if (isSubscribeModalOpen) {
           setIsSubscribeModalOpen(false);
         } else if (isPhoneAuthModalOpen) {
@@ -107,7 +117,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activePrintJournal, isSubscribeModalOpen, isPhoneAuthModalOpen, activePage]);
+  }, [activePrintJournal, isAddBakeryModalOpen, isSubscribeModalOpen, isPhoneAuthModalOpen, activePage]);
 
   const getEffectiveUserId = (): string => {
     if (phoneAccount) return phoneAccount.userId;
@@ -211,15 +221,28 @@ export default function App() {
 
   const { todayStr: liveTodayStr } = useLiveDateTime();
 
-  // Helper to create a new daily journal for any given date
-  const createNewJournalForDate = (dateStr: string, existingJournals: DailyJournal[]): DailyJournal => {
-    // Inherit sellers and contact numbers from the most recent journal so user doesn't have to re-enter info
-    const latestWithSellers = existingJournals.find((j) => j.sellers && j.sellers.length > 0);
+  // Helper to create a new daily journal for any given date and bakery
+  const createNewJournalForDate = (
+    dateStr: string,
+    existingJournals: DailyJournal[],
+    targetBakery?: BakeryBranch
+  ): DailyJournal => {
+    const activeTarget = targetBakery || bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
+    const targetBakeryId = activeTarget?.id || 'boulangerie-principale';
+    const targetBakeryName = activeTarget?.name || 'Boulangerie Principale';
+    const sellingPrice = activeTarget?.defaultSellingPrice || settings.defaultSellingPrice;
+    const returnPrice = activeTarget?.defaultReturnPrice || settings.defaultReturnPrice;
+    const costPrice = activeTarget?.defaultCostPrice || settings.defaultCostPrice;
+    const prodName = activeTarget?.defaultProductName || settings.defaultProductName;
+
+    // Inherit sellers and contact numbers from the most recent journal of THIS bakery if exists
+    const previousBakeryJournals = existingJournals.filter((j) => (j.bakeryId || 'boulangerie-principale') === targetBakeryId);
+    const latestWithSellers = previousBakeryJournals.find((j) => j.sellers && j.sellers.length > 0) || existingJournals.find((j) => j.sellers && j.sellers.length > 0);
     let sellersToUse: SellerEntry[] = [];
 
     if (latestWithSellers && latestWithSellers.sellers && latestWithSellers.sellers.length > 0) {
       sellersToUse = latestWithSellers.sellers.map((s, idx) => ({
-        id: `sel-${dateStr}-${idx}-${Date.now()}`,
+        id: `sel-${targetBakeryId}-${dateStr}-${idx}-${Date.now()}`,
         name: s.name,
         phone: s.phone,
         age: s.age,
@@ -229,7 +252,7 @@ export default function App() {
         soldCount: s.soldCount || s.totalGiven || 95,
         returnCount: s.returnCount || 0,
         lostCount: 0,
-        cashCollected: (s.soldCount || s.totalGiven || 95) * settings.defaultSellingPrice,
+        cashCollected: (s.soldCount || s.totalGiven || 95) * sellingPrice,
         notes: '',
       }));
     } else {
@@ -246,7 +269,7 @@ export default function App() {
         const age = typeof item === 'object' && item.age ? item.age : 25;
         const role = typeof item === 'object' && item.role ? item.role : 'Vendeur';
         sellersToUse.push({
-          id: `sel-${dateStr}-def-${idx}-${Date.now()}`,
+          id: `sel-${targetBakeryId}-${dateStr}-def-${idx}-${Date.now()}`,
           name: sName,
           phone,
           age,
@@ -263,21 +286,23 @@ export default function App() {
 
     const summary = calculateJournalSummary(
       sellersToUse,
-      settings.defaultSellingPrice,
-      settings.defaultReturnPrice,
-      settings.defaultCostPrice,
+      sellingPrice,
+      returnPrice,
+      costPrice,
       [],
       settings.calculationFormula
     );
 
     return {
-      id: `journal-${dateStr}`,
+      id: `journal-${targetBakeryId}-${dateStr}`,
       date: dateStr,
-      title: 'Journal de caisse',
-      productName: settings.defaultProductName,
-      unitSellingPrice: settings.defaultSellingPrice,
-      unitReturnPrice: settings.defaultReturnPrice,
-      unitCostPrice: settings.defaultCostPrice,
+      title: `Journal de caisse - ${targetBakeryName}`,
+      bakeryId: targetBakeryId,
+      bakeryName: targetBakeryName,
+      productName: prodName,
+      unitSellingPrice: sellingPrice,
+      unitReturnPrice: returnPrice,
+      unitCostPrice: costPrice,
       sellers: sellersToUse,
       expenses: [],
       summary,
@@ -286,30 +311,48 @@ export default function App() {
     };
   };
 
+  // Active Bakery Perimeter and its filtered journals
+  const activeBakery = useMemo(() => {
+    return bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
+  }, [bakeries, activeBakeryId]);
+
+  const isAllBakeries = activeBakeryId === 'all';
+
+  const activeBakeryJournals = useMemo(() => {
+    if (isAllBakeries) return journals;
+    return journals.filter((j) => (j.bakeryId || 'boulangerie-principale') === activeBakeryId);
+  }, [journals, activeBakeryId, isAllBakeries]);
+
   // Initialize or pick the current journal
   const [currentJournal, setCurrentJournal] = useState<DailyJournal>(() => {
     const todayStr = getLocalDateString();
-    const existingToday = journals.find((j) => j.date === todayStr);
+    const existingToday = journals.find((j) => j.date === todayStr && (j.bakeryId || 'boulangerie-principale') === activeBakeryId);
     if (existingToday) return existingToday;
+
+    const anyToday = journals.find((j) => j.date === todayStr);
+    if (anyToday) return anyToday;
 
     // Create a new daily journal for today so it appears automatically
     const newToday = createNewJournalForDate(todayStr, journals);
     return newToday;
   });
 
-  // Automatically ensure that each day, a new journal appears in Historique des Journaux
+  // Automatically ensure that each day, a new journal appears in Historique des Journaux for active bakery
   useEffect(() => {
     if (!liveTodayStr) return;
-    const hasToday = journals.some((j) => j.date === liveTodayStr);
+    const targetBakery = bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
+    const targetBakeryId = targetBakery?.id || 'boulangerie-principale';
+
+    const hasToday = journals.some((j) => j.date === liveTodayStr && (j.bakeryId || 'boulangerie-principale') === targetBakeryId);
     if (!hasToday) {
-      const newToday = createNewJournalForDate(liveTodayStr, journals);
+      const newToday = createNewJournalForDate(liveTodayStr, journals, targetBakery);
       setJournals((prev) => {
-        if (prev.some((j) => j.date === liveTodayStr)) return prev;
+        if (prev.some((j) => j.date === liveTodayStr && (j.bakeryId || 'boulangerie-principale') === targetBakeryId)) return prev;
         return [newToday, ...prev].sort((a, b) => b.date.localeCompare(a.date));
       });
       setCurrentJournal(newToday);
     }
-  }, [liveTodayStr, journals.length]);
+  }, [liveTodayStr, journals.length, activeBakeryId]);
 
   // Keep localStorage in sync and auto-save monthly profit records every 1 month
   useEffect(() => {
@@ -323,11 +366,68 @@ export default function App() {
     saveSettings(settings);
   }, [settings]);
 
+  // Bakery management handlers
+  const handleSelectBakery = (bakeryId: string) => {
+    setActiveBakeryId(bakeryId);
+    saveActiveBakeryId(bakeryId);
+
+    if (bakeryId !== 'all') {
+      const bJournals = journals.filter((j) => (j.bakeryId || 'boulangerie-principale') === bakeryId);
+      const todayJ = bJournals.find((j) => j.date === liveTodayStr);
+      if (todayJ) {
+        setCurrentJournal(todayJ);
+      } else if (bJournals.length > 0) {
+        setCurrentJournal(bJournals[0]);
+      } else {
+        const targetB = bakeries.find((b) => b.id === bakeryId);
+        const newJ = createNewJournalForDate(liveTodayStr, journals, targetB);
+        setJournals((prev) => [newJ, ...prev].sort((a, b) => b.date.localeCompare(a.date)));
+        setCurrentJournal(newJ);
+      }
+    }
+  };
+
+  const handleAddBakery = (newBakery: BakeryBranch) => {
+    const updatedBakeries = [...bakeries, newBakery];
+    setBakeries(updatedBakeries);
+    saveBakeries(updatedBakeries);
+
+    setActiveBakeryId(newBakery.id);
+    saveActiveBakeryId(newBakery.id);
+
+    // Create a fresh journal for today for this new bakery
+    const todayStr = getLocalDateString();
+    const newJ = createNewJournalForDate(todayStr, journals, newBakery);
+    const updatedJournals = [newJ, ...journals].sort((a, b) => b.date.localeCompare(a.date));
+    setJournals(updatedJournals);
+    saveJournals(updatedJournals);
+    setCurrentJournal(newJ);
+
+    setActivePage('journal');
+    setDashboardTab('editor');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteBakery = (bakeryId: string) => {
+    if (bakeryId === 'boulangerie-principale') return;
+    const updated = bakeries.filter((b) => b.id !== bakeryId);
+    setBakeries(updated);
+    saveBakeries(updated);
+
+    setActiveBakeryId('boulangerie-principale');
+    saveActiveBakeryId('boulangerie-principale');
+
+    const primaryJournals = journals.filter((j) => (j.bakeryId || 'boulangerie-principale') === 'boulangerie-principale');
+    if (primaryJournals.length > 0) {
+      setCurrentJournal(primaryJournals[0]);
+    }
+  };
+
   // Handle saving a journal: saves and updates Historique des Journaux
   const handleSaveJournal = async (updatedJournal: DailyJournal) => {
     const journalId = updatedJournal.id && updatedJournal.id.includes(updatedJournal.date)
       ? updatedJournal.id
-      : `journal-${updatedJournal.date}`;
+      : `journal-${updatedJournal.bakeryId || 'boulangerie-principale'}-${updatedJournal.date}`;
 
     const finalJournal: DailyJournal = {
       ...updatedJournal,
@@ -336,7 +436,7 @@ export default function App() {
     };
 
     setJournals((prev) => {
-      const existsIndex = prev.findIndex((j) => j.date === finalJournal.date || j.id === finalJournal.id);
+      const existsIndex = prev.findIndex((j) => (j.id === finalJournal.id) || (j.date === finalJournal.date && (j.bakeryId || 'boulangerie-principale') === (finalJournal.bakeryId || 'boulangerie-principale')));
       let next: DailyJournal[];
       if (existsIndex >= 0) {
         next = [...prev];
@@ -361,17 +461,20 @@ export default function App() {
   // Handle creating a blank/new journal for today or specific date
   const handleNewJournal = () => {
     const todayStr = getLocalDateString();
-    const newJ = createNewJournalForDate(todayStr, journals);
+    const targetBakery = bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
+    const targetBakeryId = targetBakery?.id || 'boulangerie-principale';
+    const newJ = createNewJournalForDate(todayStr, journals, targetBakery);
 
     setJournals((prev) => {
-      const exists = prev.find((j) => j.date === todayStr);
+      const exists = prev.find((j) => j.date === todayStr && (j.bakeryId || 'boulangerie-principale') === targetBakeryId);
       if (exists) return prev;
       return [newJ, ...prev].sort((a, b) => b.date.localeCompare(a.date));
     });
 
     setCurrentJournal(newJ);
-    setActivePage('dashboard');
+    setActivePage('journal');
     setDashboardTab('editor');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteJournal = async (id: string) => {
@@ -596,6 +699,12 @@ export default function App() {
         subscription={subscription}
         onOpenPhoneAuthModal={handleOpenPhoneAuthModal}
         onLogoutPhoneAccount={handleLogoutPhoneAccount}
+        bakeries={bakeries}
+        activeBakeryId={activeBakeryId}
+        onSelectBakery={handleSelectBakery}
+        onOpenAddBakeryModal={() => setIsAddBakeryModalOpen(true)}
+        onSelectJournal={handleSelectJournalFromHistory}
+        onDeleteBakery={handleDeleteBakery}
       />
 
       {/* Main Content Area */}
@@ -641,8 +750,7 @@ export default function App() {
         
         {/* PAGE 1: JOURNAL DE CAISSE (SAISIE QUOTIDIENNE & HISTORIQUE) */}
         {(activePage === 'journal' || activePage === 'dashboard') && (
-          <div className="space-y-8 animate-fadeIn">
-            
+          <div className="space-y-6 animate-fadeIn">
             {/* Quick Banner Linking to Gains & Synthèse de Caisse Page */}
             <div className="bg-[#2D5A43] text-white p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center space-x-3">
@@ -673,7 +781,7 @@ export default function App() {
               <DailyJournalEditor
                 currentJournal={currentJournal}
                 settings={settings}
-                journals={journals}
+                journals={activeBakeryJournals}
                 onSelectJournal={handleSelectJournalFromHistory}
                 onSaveJournal={handleSaveJournal}
                 onPrintJournal={(j) => setActivePrintJournal(j)}
@@ -725,7 +833,7 @@ export default function App() {
 
             {/* Full Journal History List with Multi-Select & Search */}
             <JournalHistoryList
-              journals={journals}
+              journals={activeBakeryJournals}
               currency={settings.currency}
               activeJournalId={currentJournal.id}
               onSelectJournal={handleSelectJournalFromHistory}
@@ -751,6 +859,9 @@ export default function App() {
             currentUserId={currentUser?.uid}
             onSelectPeriod={setSelectedPeriod}
             onUpdateSellerInfo={handleUpdateSellerInfo}
+            bakeries={bakeries}
+            activeBakeryId={activeBakeryId}
+            onSelectBakery={handleSelectBakery}
             onSelectJournal={(j) => {
               setCurrentJournal(j);
               setActivePage('journal');
@@ -832,6 +943,17 @@ export default function App() {
         onClose={() => setIsPhoneAuthModalOpen(false)}
         initialMode={phoneAuthInitialMode}
         onSuccess={handlePhoneAuthSuccess}
+      />
+
+      {/* Modal: Ajouter une nouvelle boulangerie & Périmètre */}
+      <AddBakeryModal
+        isOpen={isAddBakeryModalOpen}
+        onClose={() => setIsAddBakeryModalOpen(false)}
+        onAddBakery={handleAddBakery}
+        currency={settings.currency}
+        defaultSellingPrice={settings.defaultSellingPrice}
+        defaultReturnPrice={settings.defaultReturnPrice}
+        defaultCostPrice={settings.defaultCostPrice}
       />
 
     </div>

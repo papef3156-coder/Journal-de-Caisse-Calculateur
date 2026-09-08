@@ -45,10 +45,26 @@ export interface JournalSummary {
   lossPercentage: number;       // % Pertes (ex: 4.87%)
 }
 
+export interface BakeryBranch {
+  id: string; // ex: "boulangerie-principale", "boulangerie-fass"
+  name: string; // ex: "Boulangerie Principale"
+  bakerName?: string; // Nom du boulanger / responsable (ex: "Amadou Diallo")
+  phone?: string;
+  address?: string;
+  color?: string; // ex: "#2D5A43", "#9C6B28", "#1E40AF"
+  defaultSellingPrice?: number;
+  defaultReturnPrice?: number;
+  defaultCostPrice?: number;
+  defaultProductName?: string;
+  createdAt: string;
+}
+
 export interface DailyJournal {
   id: string;
   date: string; // YYYY-MM-DD
   title?: string;
+  bakeryId?: string; // ID de la boulangerie à laquelle appartient ce journal
+  bakeryName?: string; // Nom de la boulangerie
   productName: string;
   unitSellingPrice: number; // ex: 175 CFA
   unitReturnPrice: number;  // ex: 50 CFA

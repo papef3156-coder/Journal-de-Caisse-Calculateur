@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { DailyJournal, AppSettings, TimePeriod } from '../types';
+import { DailyJournal, AppSettings, TimePeriod, BakeryBranch } from '../types';
 import { ProfitMetricCards } from './ProfitMetricCards';
 import { AnalyticsCharts } from './AnalyticsCharts';
 import { 
@@ -25,7 +25,10 @@ import {
   FileSpreadsheet,
   Send,
   Mail,
-  MessageSquare
+  MessageSquare,
+  Store,
+  Layers,
+  UserCheck
 } from 'lucide-react';
 import { SendSynthesisModal } from './SendSynthesisModal';
 
@@ -38,6 +41,9 @@ interface GainsAndSummaryPageProps {
   onSelectPeriod: (period: TimePeriod) => void;
   onSelectJournal: (journal: DailyJournal) => void;
   onUpdateSellerInfo?: (sellerName: string, updatedInfo: { phone?: string; age?: number | string; role?: string }) => void;
+  bakeries?: BakeryBranch[];
+  activeBakeryId?: string;
+  onSelectBakery?: (bakeryId: string) => void;
 }
 
 export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
@@ -49,6 +55,9 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
   onSelectPeriod,
   onSelectJournal,
   onUpdateSellerInfo,
+  bakeries = [],
+  activeBakeryId = 'boulangerie-principale',
+  onSelectBakery,
 }) => {
   const [selectedJournalId, setSelectedJournalId] = useState<string>(currentJournal.id);
   const [simulationProduced, setSimulationProduced] = useState<number>(800);
@@ -56,10 +65,25 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
   const [simulationExpenses, setSimulationExpenses] = useState<number>(0);
   const [showSendModal, setShowSendModal] = useState(false);
 
+  // Local perimeter state inside the page (can be switched independently or synced)
+  const [localBakeryFilter, setLocalBakeryFilter] = useState<string>(activeBakeryId);
+
+  // Active bakery object
+  const activeBakery = bakeries.find((b) => b.id === localBakeryFilter) || bakeries[0];
+  const isAllBakeries = localBakeryFilter === 'all';
+
+  // Filter journals by bakery perimeter
+  const filteredJournals = useMemo(() => {
+    if (isAllBakeries) return journals;
+    return journals.filter((j) => (j.bakeryId || bakeries[0]?.id) === localBakeryFilter);
+  }, [journals, localBakeryFilter, isAllBakeries, bakeries]);
+
   // Active journal for daily summary
   const activeJournal = useMemo(() => {
-    return journals.find(j => j.id === selectedJournalId) || currentJournal;
-  }, [journals, selectedJournalId, currentJournal]);
+    const found = filteredJournals.find(j => j.id === selectedJournalId);
+    if (found) return found;
+    return filteredJournals[0] || currentJournal;
+  }, [filteredJournals, selectedJournalId, currentJournal]);
 
   const summary = activeJournal?.summary || {
     totalProducedOrGiven: 0,
@@ -104,34 +128,97 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-[#EBE8E0] p-1.5 rounded-xl border border-[#DCD6CB] shrink-0 self-start md:self-auto">
-          <span className="text-xs font-semibold text-[#5C574F] px-2 font-editorial">Période d'analyse :</span>
-          {(['today', 'all', 'month', 'year'] as TimePeriod[]).map((p) => {
-            const labelMap: Record<TimePeriod, string> = {
-              today: "Aujourd'hui",
-              '7days': '7 Jours',
-              all: 'Tous les Jours',
-              month: '1 Mois',
-              year: '1 An',
-            };
-            const isSelected = selectedPeriod === p || (p === 'all' && selectedPeriod === '7days');
-            return (
-              <button
-                key={p}
-                id={`btn-period-${p}`}
-                onClick={() => onSelectPeriod(p)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#2D5A43] text-white shadow-xs'
-                    : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
-                }`}
+        <div className="flex items-center gap-2.5 flex-wrap self-start md:self-auto">
+          {/* Bakery Perimeter Filter */}
+          {bakeries.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-[#EBE8E0] p-1 rounded-xl border border-[#DCD6CB]">
+              <span className="text-xs font-semibold text-[#5C574F] px-1 font-editorial flex items-center gap-1">
+                <Store className="w-3.5 h-3.5 text-[#2D5A43]" />
+                <span className="hidden sm:inline">Périmètre :</span>
+              </span>
+              <select
+                id="select-bakery-gains-filter"
+                value={localBakeryFilter}
+                onChange={(e) => {
+                  setLocalBakeryFilter(e.target.value);
+                  if (onSelectBakery) onSelectBakery(e.target.value);
+                }}
+                className="bg-[#FAFAF7] border border-[#DCD6CB] text-[#1A1A1A] text-xs font-bold rounded-lg px-2 py-1 focus:ring-1 focus:ring-[#2D5A43] focus:outline-none cursor-pointer"
               >
-                {labelMap[p]}
-              </button>
-            );
-          })}
+                <option value="all">🌟 Toutes les boulangeries (Consolidé)</option>
+                {bakeries.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    🥖 {b.name} {b.bakerName ? `(${b.bakerName})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Time Period Filter */}
+          <div className="flex items-center gap-1 bg-[#EBE8E0] p-1 rounded-xl border border-[#DCD6CB]">
+            <span className="text-xs font-semibold text-[#5C574F] px-1 font-editorial hidden lg:inline">Période :</span>
+            {(['today', 'all', 'month', 'year'] as TimePeriod[]).map((p) => {
+              const labelMap: Record<TimePeriod, string> = {
+                today: "Aujourd'hui",
+                '7days': '7 Jours',
+                all: 'Tous les Jours',
+                month: '1 Mois',
+                year: '1 An',
+              };
+              const isSelected = selectedPeriod === p || (p === 'all' && selectedPeriod === '7days');
+              return (
+                <button
+                  key={p}
+                  id={`btn-period-${p}`}
+                  onClick={() => onSelectPeriod(p)}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#2D5A43] text-white shadow-xs'
+                      : 'text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#F4F1EA]'
+                  }`}
+                >
+                  {labelMap[p]}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      {/* Active Bakery Perimeter Banner (if specific bakery selected) */}
+      {!isAllBakeries && activeBakery && (
+        <div className="bg-white border border-[#DCD6CB] rounded-2xl p-3.5 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center space-x-3">
+            <div 
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-2xs"
+              style={{ backgroundColor: activeBakery.color || '#2D5A43' }}
+            >
+              <Store className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-bold text-sm text-[#1A1A1A] font-editorial">{activeBakery.name}</h3>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E7EFEA] text-[#2D5A43] font-bold border border-[#C3D9CD]">
+                  Périmètre actif
+                </span>
+              </div>
+              <p className="text-xs text-[#7A756D] font-editorial">
+                {activeBakery.bakerName ? `Boulanger : ${activeBakery.bakerName}` : ''} 
+                {activeBakery.address ? ` • ${activeBakery.address}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setLocalBakeryFilter('all')}
+            className="text-xs text-[#2D5A43] hover:underline font-bold cursor-pointer"
+          >
+            Voir vue consolidée globale
+          </button>
+        </div>
+      )}
 
       {/* 2. SECTION A: CALCUL DES GAINS & BÉNÉFICES (Cartes 1J, Tous les Jours, 1M, 1A) */}
       <section id="page-section-gains" className="space-y-4">
@@ -143,12 +230,12 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
             </h3>
           </div>
           <span className="text-xs font-mono-num font-semibold text-[#2D5A43] bg-[#E7EFEA] border border-[#C3D9CD] px-2.5 py-1 rounded-lg">
-            {journals.length} journaux enregistrés
+            {filteredJournals.length} journaux dans ce périmètre
           </span>
         </div>
 
         <ProfitMetricCards
-          journals={journals}
+          journals={filteredJournals}
           currency={settings.currency}
           selectedPeriod={selectedPeriod}
           onSelectPeriod={onSelectPeriod}
@@ -182,7 +269,7 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
                 onChange={(e) => setSelectedJournalId(e.target.value)}
                 className="bg-[#FAFAF7] border border-[#DCD6CB] text-[#1A1A1A] text-xs font-semibold rounded-xl px-3 py-2 focus:ring-2 focus:ring-[#2D5A43] focus:outline-none"
               >
-                {journals.map((j) => (
+                {filteredJournals.map((j) => (
                   <option key={j.id} value={j.id}>
                     {formatDateFrench(j.date)} — Gain: {formatCurrency(j.summary?.netGain ?? 0, settings.currency)}
                   </option>
@@ -288,7 +375,7 @@ export const GainsAndSummaryPage: React.FC<GainsAndSummaryPageProps> = ({
           </div>
 
           <AnalyticsCharts
-            journals={journals}
+            journals={filteredJournals}
             currency={settings.currency}
             selectedPeriod={selectedPeriod}
             currentUserId={currentUserId}

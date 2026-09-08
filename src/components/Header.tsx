@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivePage, AppSettings, DailyJournal, PhoneAccount, UserSubscription } from '../types';
+import { ActivePage, AppSettings, DailyJournal, PhoneAccount, UserSubscription, BakeryBranch } from '../types';
 import { 
   Calculator, 
   Settings as SettingsIcon, 
@@ -13,6 +13,7 @@ import {
   Camera
 } from 'lucide-react';
 import { MicrosoftAuthButton } from './MicrosoftAuthButton';
+import { BakeryPerimeterSelector } from './BakeryPerimeterSelector';
 import { User } from 'firebase/auth';
 import defaultStoreLogo from '../assets/images/store_profile_logo_1788716413614.jpg';
 
@@ -31,6 +32,12 @@ interface HeaderProps {
   subscription?: UserSubscription | null;
   onOpenPhoneAuthModal?: (mode: 'register' | 'login') => void;
   onLogoutPhoneAccount?: () => void;
+  bakeries?: BakeryBranch[];
+  activeBakeryId?: string;
+  onSelectBakery?: (bakeryId: string) => void;
+  onOpenAddBakeryModal?: () => void;
+  onSelectJournal?: (journal: DailyJournal) => void;
+  onDeleteBakery?: (bakeryId: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,7 +54,13 @@ export const Header: React.FC<HeaderProps> = ({
   phoneAccount,
   subscription,
   onOpenPhoneAuthModal,
-  onLogoutPhoneAccount
+  onLogoutPhoneAccount,
+  bakeries = [],
+  activeBakeryId = 'boulangerie-principale',
+  onSelectBakery,
+  onOpenAddBakeryModal,
+  onSelectJournal,
+  onDeleteBakery,
 }) => {
   const [profileLogo, setProfileLogo] = React.useState<string>(() => {
     return localStorage.getItem('app_custom_profile_logo') || defaultStoreLogo;
@@ -134,6 +147,26 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Bakery Perimeter Switcher & Management */}
+            {bakeries.length > 0 && onSelectBakery && onOpenAddBakeryModal && (
+              <div className="ml-1 sm:ml-2">
+                <BakeryPerimeterSelector
+                  bakeries={bakeries}
+                  activeBakeryId={activeBakeryId}
+                  journals={journals}
+                  onSelectBakery={onSelectBakery}
+                  onOpenAddBakeryModal={onOpenAddBakeryModal}
+                  onNewJournalForActiveBakery={onNewJournal}
+                  onNavigateToGains={() => setActivePage('gains_summary')}
+                  onSelectJournal={(j) => {
+                    if (onSelectJournal) onSelectJournal(j);
+                    setActivePage('journal');
+                  }}
+                  onDeleteBakery={onDeleteBakery}
+                />
+              </div>
+            )}
           </div>
 
             {/* Main Pages Navigation & Quick Action */}
@@ -222,15 +255,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Nouvel onglet</span>
               </a>
             )}
-
-            <button
-              id="btn-quick-new-journal"
-              onClick={onNewJournal}
-              className="hidden lg:inline-flex items-center space-x-2 bg-[#2D5A43] hover:bg-[#234735] active:bg-[#1B3628] text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors shadow-xs cursor-pointer"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Nouveau Journal</span>
-            </button>
           </div>
 
         </div>

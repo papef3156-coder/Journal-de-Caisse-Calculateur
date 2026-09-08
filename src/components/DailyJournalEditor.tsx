@@ -491,6 +491,11 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
             <h3 className="font-bold text-base font-editorial text-[#F4F1EA] tracking-wide">
               Synthèse Journalière de Caisse
             </h3>
+            {currentJournal.bakeryName && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#2D5A43] text-[#E7EFEA] border border-[#3D7A5C] font-semibold">
+                🥖 {currentJournal.bakeryName}
+              </span>
+            )}
           </div>
 
           {/* Quick Messaging Actions (Gmail Google, Messages SMS, Options) */}
