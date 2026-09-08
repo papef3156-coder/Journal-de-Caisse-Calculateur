@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Journal de Caisse &amp; Calculateur de Gains</string>
+    <string name="dashboard_tab_editor">Caisse du Jour</string>
+    <string name="dashboard_tab_gains">Calcul des Gains</string>
+    <string name="dashboard_tab_history">Historique</string>
+    <string name="dashboard_tab_settings">Paramètres</string>
+</resources>
