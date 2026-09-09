@@ -1,5 +1,6 @@
 import React from 'react';
 import { ActivePage, AppSettings, DailyJournal } from '../types';
+import { Download } from 'lucide-react';
 import { 
   PlusCircle, 
   Users,
@@ -21,6 +22,7 @@ interface HeaderProps {
   onSyncCloud?: () => Promise<void>;
   isCloudSyncing?: boolean;
   onOpenGoogleModal?: () => void;
+  onOpenInstallModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSyncCloud,
   isCloudSyncing = false,
   onOpenGoogleModal,
+  onOpenInstallModal,
 }) => {
   const [profileLogo, setProfileLogo] = React.useState<string>(() => {
     return localStorage.getItem('app_custom_profile_logo') || defaultStoreLogo;
@@ -201,6 +204,20 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Nouveau Journal</span>
             </button>
 
+            {/* Bouton Installer l'application Desktop */}
+            {onOpenInstallModal && (
+              <button
+                type="button"
+                id="btn-header-install-app"
+                onClick={onOpenInstallModal}
+                className="inline-flex items-center space-x-1.5 bg-white hover:bg-[#F4F1EA] text-[#2D5A43] border border-[#C3D9CD] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
+                title="Installer l'application sur votre téléphone Android ou ordinateur"
+              >
+                <Download className="w-4 h-4 text-[#2D5A43]" />
+                <span>Installer</span>
+              </button>
+            )}
+
             {/* Menu Compte Google Desktop */}
             <GoogleAccountMenu
               currentUser={currentUser}
@@ -210,8 +227,21 @@ export const Header: React.FC<HeaderProps> = ({
             />
           </div>
 
-          {/* Actions rapides mobile : Compte Google + Nouveau Journal */}
-          <div className="flex md:hidden items-center justify-end space-x-2">
+          {/* Actions rapides mobile : Installer + Compte Google + Nouveau Journal */}
+          <div className="flex md:hidden items-center justify-end space-x-1.5">
+            {onOpenInstallModal && (
+              <button
+                type="button"
+                id="btn-header-install-app-mobile"
+                onClick={onOpenInstallModal}
+                className="flex items-center space-x-1 px-2.5 py-1.5 bg-white hover:bg-[#F4F1EA] text-[#2D5A43] border border-[#C3D9CD] rounded-xl text-xs font-bold active:scale-95 transition-transform cursor-pointer shadow-2xs"
+                title="Installer l'application sur votre téléphone Android"
+              >
+                <Download className="w-3.5 h-3.5 text-[#2D5A43]" />
+                <span className="text-[11px]">Installer</span>
+              </button>
+            )}
+
             <GoogleAccountMenu
               currentUser={currentUser}
               onSyncCloud={onSyncCloud}

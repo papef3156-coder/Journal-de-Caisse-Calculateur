@@ -16,6 +16,7 @@ import { JournalHistoryList } from './components/JournalHistoryList';
 import { AndroidBottomNav } from './components/AndroidBottomNav';
 import { ReceiptModal } from './components/ReceiptModal';
 import { GoogleAccountModal } from './components/GoogleAccountModal';
+import { AndroidInstallModal } from './components/AndroidInstallModal';
 import { 
   auth, 
   ensureAuthUser, 
@@ -42,6 +43,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
   const [dismissGoogleBanner, setDismissGoogleBanner] = useState<boolean>(() => {
     return localStorage.getItem('dismiss_google_sync_banner') === 'true';
   });
