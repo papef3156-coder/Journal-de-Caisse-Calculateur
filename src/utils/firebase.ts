@@ -7,6 +7,7 @@ import {
   signInWithPopup, 
   signOut, 
   onAuthStateChanged,
+  signInAnonymously,
   User 
 } from 'firebase/auth';
 import { 
@@ -27,9 +28,24 @@ import { calculateJournalSummary } from './calculations';
 // Initialize Firebase App singleton
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
+const customDbId = (firebaseConfig as any).firestoreDatabaseId;
+export const db = customDbId ? getFirestore(app, customDbId) : getFirestore(app);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
+
+/**
+ * Ensure an authenticated Firebase user exists (via active session, Google, or anonymous)
+ */
+export async function ensureAuthUser(): Promise<User | null> {
+  if (auth.currentUser) return auth.currentUser;
+  try {
+    const cred = await signInAnonymously(auth);
+    return cred.user;
+  } catch (err) {
+    console.warn('Anonymous sign-in unavailable or not enabled in Firebase Auth:', err);
+    return auth.currentUser;
+  }
+}
 
 // Add offline prompt configuration
 googleProvider.setCustomParameters({
@@ -133,6 +149,39 @@ export async function signInWithGoogle(): Promise<User> {
 }
 
 /**
+ * Link or associate a Google account by email
+ */
+export async function linkGoogleAccount(email: string, displayName?: string): Promise<{ uid: string; email: string; displayName: string }> {
+  let user = auth.currentUser;
+  if (!user) {
+    user = await ensureAuthUser();
+  }
+  const uid = user ? user.uid : `user-${Date.now()}`;
+  const cleanEmail = email.trim().toLowerCase();
+  const name = displayName?.trim() || cleanEmail.split('@')[0];
+
+  const profile = {
+    uid,
+    email: cleanEmail,
+    displayName: name,
+    provider: 'google.com',
+    photoURL: '',
+    lastLoginAt: new Date().toISOString()
+  };
+
+  try {
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, profile, { merge: true });
+    localStorage.setItem('linked_google_account', JSON.stringify(profile));
+  } catch (err) {
+    console.warn('Firestore profile sync error (saved locally):', err);
+    localStorage.setItem('linked_google_account', JSON.stringify(profile));
+  }
+
+  return profile;
+}
+
+/**
  * Sign out current user
  */
 export async function logoutUser(): Promise<void> {
@@ -149,12 +198,43 @@ export async function logoutUser(): Promise<void> {
  */
 export async function saveJournalToCloud(userId: string, journal: DailyJournal): Promise<void> {
   try {
-    const journalRef = doc(db, 'users', userId, 'journals', journal.id || `journal-${journal.date}`);
-    await setDoc(journalRef, {
-      ...journal,
+    const journalId = journal.id || `journal-${journal.date}`;
+    const journalRef = doc(db, 'users', userId, 'journals', journalId);
+    
+    const cleanPayload = {
+      id: journalId,
+      date: journal.date,
+      title: journal.title || `Journal du ${journal.date}`,
+      productName: journal.productName || 'Pain / Baguette',
+      unitSellingPrice: Number(journal.unitSellingPrice) || 175,
+      unitReturnPrice: Number(journal.unitReturnPrice) || 50,
+      unitCostPrice: Number(journal.unitCostPrice) || 100,
+      sellers: (journal.sellers || []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        phone: s.phone || '',
+        role: s.role || 'Vendeur',
+        totalGiven: Number(s.totalGiven) || 0,
+        soldCount: Number(s.soldCount) || 0,
+        returnCount: Number(s.returnCount) || 0,
+        lostCount: Number(s.lostCount) || 0,
+        cashCollected: Number(s.cashCollected) || ((Number(s.soldCount) || 0) * (Number(journal.unitSellingPrice) || 175)),
+        notes: s.notes || '',
+      })),
+      expenses: (journal.expenses || []).map((e) => ({
+        id: e.id,
+        label: e.label || '',
+        amount: Number(e.amount) || 0,
+      })),
+      summary: journal.summary || null,
+      notes: journal.notes || '',
       userId,
-      syncedAt: new Date().toISOString()
-    }, { merge: true });
+      syncedAt: new Date().toISOString(),
+      updatedAt: journal.updatedAt || new Date().toISOString(),
+      createdAt: journal.createdAt || new Date().toISOString(),
+    };
+
+    await setDoc(journalRef, cleanPayload, { merge: true });
   } catch (error) {
     console.error('Failed to save journal to cloud:', error);
     throw error;

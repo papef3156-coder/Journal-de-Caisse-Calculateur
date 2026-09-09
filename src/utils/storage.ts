@@ -1,22 +1,6 @@
-import { AppSettings, DailyJournal, SellerEntry, SellerInfo, BakeryBranch } from '../types';
+import { AppSettings, DailyJournal, SellerEntry, SellerInfo } from '../types';
 import { calculateJournalSummary } from './calculations';
 import { getLocalDateString } from './dateTime';
-
-export const DEFAULT_BAKERIES: BakeryBranch[] = [
-  {
-    id: 'boulangerie-principale',
-    name: 'Boulangerie Principale',
-    bakerName: 'Boulanger en Chef',
-    phone: '+221 77 123 45 67',
-    address: 'Boutique Principale - Dakar',
-    color: '#2D5A43',
-    defaultProductName: 'Pain / Baguette',
-    defaultSellingPrice: 175,
-    defaultReturnPrice: 50,
-    defaultCostPrice: 100,
-    createdAt: '2026-09-01T00:00:00.000Z',
-  },
-];
 
 export const DEFAULT_SELLER_PROFILES: SellerInfo[] = [
   { name: 'Babacar', phone: '+221 77 123 45 67', age: 29, role: 'Vendeur Principal' },
@@ -45,8 +29,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 const STORAGE_KEY_JOURNALS = 'merchant_cash_journals_v2';
 const STORAGE_KEY_SETTINGS = 'merchant_cash_settings_v2';
-const STORAGE_KEY_BAKERIES = 'merchant_cash_bakeries_v1';
-const STORAGE_KEY_ACTIVE_BAKERY = 'merchant_cash_active_bakery_v1';
 
 export function getInitialSellers(): SellerEntry[] {
   // Directly from the user's image with rich identification
@@ -171,8 +153,6 @@ function generateInitialDemoJournals(): DailyJournal[] {
       id: `journal-${item.dateStr}`,
       date: item.dateStr,
       title: item.title,
-      bakeryId: 'boulangerie-principale',
-      bakeryName: 'Boulangerie Principale',
       productName: 'Pain / Baguette',
       unitSellingPrice: 175,
       unitReturnPrice: 50,
@@ -212,8 +192,6 @@ export function normalizeJournal(j: any, settings: AppSettings = DEFAULT_SETTING
     id: j.id || `journal-${j.date || Date.now()}`,
     date: j.date || getLocalDateString(),
     title: j.title || `Journal de caisse - ${j.date || ''}`,
-    bakeryId: j.bakeryId || 'boulangerie-principale',
-    bakeryName: j.bakeryName || 'Boulangerie Principale',
     productName: j.productName || settings.defaultProductName || 'Pain / Baguette',
     unitSellingPrice: sellingPrice,
     unitReturnPrice: returnPrice,
@@ -287,47 +265,5 @@ export function saveJournals(journals: DailyJournal[]): void {
     localStorage.setItem(STORAGE_KEY_JOURNALS, JSON.stringify(journals));
   } catch (err) {
     console.error('Failed to save journals', err);
-  }
-}
-
-export function loadBakeries(): BakeryBranch[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_BAKERIES);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.error('Failed to load bakeries from storage', err);
-  }
-  saveBakeries(DEFAULT_BAKERIES);
-  return DEFAULT_BAKERIES;
-}
-
-export function saveBakeries(bakeries: BakeryBranch[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_BAKERIES, JSON.stringify(bakeries));
-  } catch (err) {
-    console.error('Failed to save bakeries to storage', err);
-  }
-}
-
-export function loadActiveBakeryId(): string {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_BAKERY);
-    if (saved) return saved;
-  } catch (err) {
-    console.error('Failed to load active bakery id', err);
-  }
-  return DEFAULT_BAKERIES[0].id;
-}
-
-export function saveActiveBakeryId(id: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_ACTIVE_BAKERY, id);
-  } catch (err) {
-    console.error('Failed to save active bakery id', err);
   }
 }
