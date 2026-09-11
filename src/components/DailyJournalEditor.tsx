@@ -34,7 +34,6 @@ import {
   FolderDown,
   Download,
   FileText,
-  Calculator,
   Mail,
   MessageSquare,
   Send,
@@ -64,7 +63,6 @@ interface DailyJournalEditorProps {
   onUpdateSettings?: (settings: AppSettings) => void;
   journals?: DailyJournal[];
   onSelectJournal?: (journal: DailyJournal) => void;
-  onNavigateToSynthesis?: () => void;
 }
 
 export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
@@ -76,7 +74,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
   onUpdateSettings,
   journals = [],
   onSelectJournal,
-  onNavigateToSynthesis,
 }) => {
   const { todayStr: liveTodayStr, timeStr: liveTimeStr } = useLiveDateTime();
   const [date, setDate] = useState(currentJournal.date || getLocalDateString());
@@ -317,22 +314,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   };
 
-  const handleSellingPriceChange = (val: number) => {
-    const newPrice = Math.max(0, val);
-    setUnitSellingPrice(newPrice);
-    setSellers((prev) =>
-      prev.map((s) => ({
-        ...s,
-        cashCollected: (Number(s.soldCount) || 0) * newPrice,
-      }))
-    );
-  };
-
-  const handleReturnPriceChange = (val: number) => {
-    const newPrice = Math.max(0, val);
-    setUnitReturnPrice(newPrice);
-  };
-
   // Date change handler: if an archived journal already exists for this date, switch to it
   const handleDateChange = (newDate: string) => {
     setDate(newDate);
@@ -510,6 +491,11 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
             <h3 className="font-bold text-base font-editorial text-[#F4F1EA] tracking-wide">
               Synthèse Journalière de Caisse
             </h3>
+            {currentJournal.bakeryName && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#2D5A43] text-[#E7EFEA] border border-[#3D7A5C] font-semibold">
+                🥖 {currentJournal.bakeryName}
+              </span>
+            )}
           </div>
 
           {/* Quick Messaging Actions (Gmail Google, Messages SMS, Options) */}
@@ -685,19 +671,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
               <span>Envoyer Synthèse</span>
             </button>
 
-            {onNavigateToSynthesis && (
-              <button
-                id="btn-goto-synthesis"
-                type="button"
-                onClick={onNavigateToSynthesis}
-                title="Consulter la synthèse journalière de caisse complète"
-                className="flex items-center space-x-1.5 bg-[#E7EFEA] hover:bg-[#D8EADB] text-[#2D5A43] px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-colors border border-[#C3D9CD] cursor-pointer shadow-2xs"
-              >
-                <Calculator className="w-4 h-4 text-[#2D5A43]" />
-                <span>Page Synthèse</span>
-              </button>
-            )}
-
             <button
               id="btn-print-receipt"
               onClick={() => onPrintJournal({
@@ -754,14 +727,16 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
           </div>
         )}
 
-        {/* Configurations du jour : Date, Prix Vente et Prix Retour */}
-        <div className="pt-4 border-t border-[#EBE8E0] grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Colonne 1 : Date */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#4A463F] flex items-center gap-1.5 font-editorial">
-              <Calendar className="w-3.5 h-3.5 text-[#2D5A43]" />
-              <span>Date du journal</span>
-            </label>
+        {/* Configurations rapides du jour (Date) */}
+        <div className="pt-4 border-t border-[#EBE8E0]">
+          {/* Colonne Date */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#4A463F] flex items-center gap-1.5 font-editorial">
+                <Calendar className="w-3.5 h-3.5 text-[#2D5A43]" />
+                <span>Date du journal</span>
+              </label>
+            </div>
 
             <div className="flex items-center gap-2">
               <input
@@ -772,6 +747,7 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                 className="flex-1 bg-[#F4F1EA] border border-[#DCD6CB] rounded-lg px-3 py-1.5 text-[#1A1A1A] font-semibold font-mono-num focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D5A43]"
               />
 
+              {/* Quick shortcut to live today's date */}
               <button
                 id="btn-set-today-date"
                 type="button"
@@ -784,14 +760,16 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                 }`}
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>Aujourd'hui</span>
+                <span>Aujourd'hui (Auto)</span>
               </button>
             </div>
 
             {/* Quick date chips */}
-            <div className="flex items-center gap-1.5 flex-wrap text-xs pt-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap text-xs">
+              <span className="text-[11px] text-[#7A756D] font-editorial">Raccourcis :</span>
               <button
                 type="button"
+                id="btn-quick-yesterday"
                 onClick={() => handleDateChange(getOffsetDateString(-1))}
                 className="px-2 py-0.5 rounded-md bg-[#EBE8E0] hover:bg-[#DCD6CB] text-[#4A463F] text-[11px] font-medium border border-[#DCD6CB] transition-colors cursor-pointer"
               >
@@ -799,6 +777,7 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
               </button>
               <button
                 type="button"
+                id="btn-quick-today"
                 onClick={() => handleDateChange(liveTodayStr)}
                 className={`px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors cursor-pointer ${
                   date === liveTodayStr
@@ -808,71 +787,15 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
               >
                 Aujourd'hui
               </button>
+              <button
+                type="button"
+                id="btn-quick-tomorrow"
+                onClick={() => handleDateChange(getOffsetDateString(1))}
+                className="px-2 py-0.5 rounded-md bg-[#EBE8E0] hover:bg-[#DCD6CB] text-[#4A463F] text-[11px] font-medium border border-[#DCD6CB] transition-colors cursor-pointer"
+              >
+                Demain
+              </button>
             </div>
-          </div>
-
-          {/* Colonne 2 : Prix de Vente Unitaire (CFA) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#4A463F] flex items-center justify-between font-editorial">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#2D5A43]"></span>
-                <span>Prix Vente Unitaire</span>
-              </span>
-              <span className="text-[10px] text-[#2D5A43] font-semibold font-mono-num">
-                Appliqué aux vendeurs
-              </span>
-            </label>
-
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  id="input-unit-selling-price"
-                  type="number"
-                  min="0"
-                  value={unitSellingPrice}
-                  onChange={(e) => handleSellingPriceChange(Number(e.target.value) || 0)}
-                  className="w-full bg-[#F4F1EA] border border-[#DCD6CB] rounded-lg px-3 py-1.5 text-[#1A1A1A] font-bold font-mono-num text-base focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D5A43]"
-                />
-                <span className="absolute right-3 top-2 text-xs font-bold text-[#7A756D] pointer-events-none">
-                  {settings.currency}
-                </span>
-              </div>
-            </div>
-            <p className="text-[10px] text-[#7A756D] italic">
-              Recette par vendeur = Vente × {unitSellingPrice} {settings.currency}
-            </p>
-          </div>
-
-          {/* Colonne 3 : Prix de Retour Reprise (CFA) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#4A463F] flex items-center justify-between font-editorial">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#9C6B28]"></span>
-                <span>Prix Retour Reprise</span>
-              </span>
-              <span className="text-[10px] text-[#8B3A3A] font-semibold font-mono-num">
-                Perte : {Math.max(0, unitSellingPrice - unitReturnPrice)} {settings.currency}/pain
-              </span>
-            </label>
-
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  id="input-unit-return-price"
-                  type="number"
-                  min="0"
-                  value={unitReturnPrice}
-                  onChange={(e) => handleReturnPriceChange(Number(e.target.value) || 0)}
-                  className="w-full bg-[#F4F1EA] border border-[#DCD6CB] rounded-lg px-3 py-1.5 text-[#9C6B28] font-bold font-mono-num text-base focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#9C6B28]"
-                />
-                <span className="absolute right-3 top-2 text-xs font-bold text-[#7A756D] pointer-events-none">
-                  {settings.currency}
-                </span>
-              </div>
-            </div>
-            <p className="text-[10px] text-[#7A756D] italic">
-              Perte retours = Retours × ({unitSellingPrice} - {unitReturnPrice})
-            </p>
           </div>
         </div>
       </div>
@@ -947,143 +870,8 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
           </div>
         </div>
 
-        {/* VUE MOBILE ANDROID (sm:hidden) : Cartes tactiles ergonomiques par vendeur */}
-        <div className="block sm:hidden p-3 space-y-3 bg-[#F4F1EA]/60">
-          {sellers.map((seller, index) => {
-            const sold = Number(seller.soldCount) || 0;
-            const lineRevenue = sold * unitSellingPrice;
-
-            return (
-              <div 
-                key={seller.id}
-                className="bg-white rounded-2xl border border-[#DCD6CB] p-3.5 space-y-2.5 shadow-2xs"
-              >
-                {/* En-tête de la carte vendeur */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-6 h-6 rounded-full bg-[#2D5A43]/10 text-[#2D5A43] text-xs flex items-center justify-center font-bold font-mono-num shrink-0">
-                      {index + 1}
-                    </span>
-                    <span className="font-bold text-[#1A1A1A] text-sm truncate max-w-[200px]">
-                      {seller.name}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveSeller(seller.id)}
-                    disabled={sellers.length <= 1}
-                    title="Supprimer ce vendeur"
-                    className="min-w-[40px] min-h-[40px] flex items-center justify-center text-[#8C877E] hover:text-[#8B3A3A] disabled:opacity-20 active:scale-95 transition-transform"
-                  >
-                    <Trash2 className="w-4 h-4 text-[#8B3A3A]" />
-                  </button>
-                </div>
-
-                {/* 3 Blocs de saisie adaptés au toucher sur écran mobile */}
-                <div className="grid grid-cols-3 gap-2">
-                  {/* Confié */}
-                  <div className="bg-[#F4F1EA] p-2 rounded-xl border border-[#DCD6CB] text-center">
-                    <label className="text-[10px] font-bold text-[#5C574F] uppercase tracking-wider block mb-1">
-                      Confié
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      min="0"
-                      value={seller.totalGiven}
-                      onChange={(e) => handleSellerChange(seller.id, 'totalGiven', Number(e.target.value) || 0)}
-                      className="w-full text-center font-bold text-base text-[#1A1A1A] font-mono-num bg-transparent focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Vente */}
-                  <div className="bg-[#E7EFEA] p-2 rounded-xl border border-[#C3D9CD] text-center">
-                    <label className="text-[10px] font-bold text-[#2D5A43] uppercase tracking-wider block mb-1">
-                      Vente {sellerAutoCalcMode === 'sold_from_return' ? 'Auto' : ''}
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      min="0"
-                      value={seller.soldCount}
-                      onChange={(e) => handleSellerChange(seller.id, 'soldCount', Number(e.target.value) || 0)}
-                      className="w-full text-center font-bold text-base text-[#2D5A43] font-mono-num bg-transparent focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Retour */}
-                  <div className="bg-[#FAF3E8] p-2 rounded-xl border border-[#E8D9C0] text-center">
-                    <label className="text-[10px] font-bold text-[#9C6B28] uppercase tracking-wider block mb-1">
-                      Retour {sellerAutoCalcMode === 'return_from_sold' ? 'Auto' : ''}
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      min="0"
-                      value={seller.returnCount}
-                      onChange={(e) => handleSellerChange(seller.id, 'returnCount', Number(e.target.value) || 0)}
-                      className="w-full text-center font-bold text-base text-[#9C6B28] font-mono-num bg-transparent focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Ligne Recette Encaissée */}
-                <div className="flex items-center justify-between pt-1 border-t border-[#F4F1EA] text-xs">
-                  <span className="text-[11px] text-[#7A756D]">
-                    {sold} × {unitSellingPrice} {settings.currency}
-                  </span>
-                  <div className="text-right">
-                    <span className="text-[10px] text-[#7A756D] mr-1.5 font-medium">Recette :</span>
-                    <strong className="text-sm font-bold text-[#2D5A43] font-mono-num">
-                      {formatCurrency(lineRevenue, settings.currency)}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Carte récapitulative Total Mobile */}
-          <div className="bg-[#2D5A43] text-white rounded-2xl p-4 shadow-xs space-y-2">
-            <div className="flex items-center justify-between text-xs font-semibold text-[#D8EADB]">
-              <span>TOTAL DU JOUR</span>
-              <span>{sellers.length} vendeurs</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-white/20">
-              <div>
-                <span className="text-[10px] text-[#D8EADB] block uppercase">Confié</span>
-                <strong className="text-sm font-bold font-mono-num text-white">
-                  {formatNumber(summary.totalProducedOrGiven)}
-                </strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-[#D8EADB] block uppercase">Vendu</span>
-                <strong className="text-sm font-bold font-mono-num text-[#93E6B8]">
-                  {formatNumber(summary.totalSold)}
-                </strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-[#D8EADB] block uppercase">Retours</span>
-                <strong className="text-sm font-bold font-mono-num text-[#F9D093]">
-                  {formatNumber(summary.totalReturned)}
-                </strong>
-              </div>
-            </div>
-            <div className="pt-2 border-t border-white/20 flex items-center justify-between">
-              <span className="text-xs text-[#D8EADB]">Recette Vente Totale :</span>
-              <span className="text-base font-bold font-mono-num text-white">
-                {formatCurrency(summary.grossRevenue, settings.currency)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* VUE TABLEAU TABLETTE & ORDINATEUR (hidden sm:block) */}
-        <div className="hidden sm:block overflow-x-auto">
+        {/* Responsive Table */}
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-sm" id="table-sellers-accounting">
             <thead className="bg-[#EBE8E0] text-[#4A463F] font-bold text-xs uppercase tracking-wider border-b border-[#DCD6CB]">
               <tr>
@@ -1095,9 +883,7 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                 <th className="py-3 px-3 text-center text-[#9C6B28] font-editorial">
                   Retour {sellerAutoCalcMode === 'return_from_sold' ? '(Confié - Vente)' : ''}
                 </th>
-                <th className="py-3 px-4 text-right font-editorial">
-                  Prix Vente & Recette
-                </th>
+                <th className="py-3 px-4 text-right font-editorial">Prix Vente</th>
                 <th className="py-3 px-2 text-center w-10"></th>
               </tr>
             </thead>
@@ -1161,14 +947,9 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                       />
                     </td>
 
-                    {/* Prix Vente & Recette */}
-                    <td className="py-2.5 px-4 text-right font-mono-num">
-                      <div className="font-bold text-[#1A1A1A] text-sm">
-                        {formatCurrency(lineRevenue, settings.currency)}
-                      </div>
-                      <div className="text-[10px] text-[#7A756D]">
-                        {sold} × {unitSellingPrice} {settings.currency}
-                      </div>
+                    {/* Recette Encaissée */}
+                    <td className="py-2.5 px-4 text-right font-bold text-[#1A1A1A] font-mono-num">
+                      {formatCurrency(lineRevenue, settings.currency)}
                     </td>
 
                     {/* Delete row */}
