@@ -795,42 +795,6 @@ export default function App() {
         {/* PAGE HISTORIQUE DÉDIÉE */}
         {activePage === 'history' && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Action & Info Banner */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[#DCD6CB] shadow-xs">
-              <div>
-                <h2 className="text-xl font-bold font-editorial text-[#1A1A1A] flex items-center gap-2">
-                  <Calendar className="w-6 h-6 text-[#2D5A43]" />
-                  <span>Gestion & Historique des Journaux</span>
-                </h2>
-                <p className="text-xs text-[#7A756D] font-editorial mt-1">
-                  Consultez, modifiez, imprimez vos tickets de caisse ou supprimez vos archives de journaux quotidiens.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  id="btn-history-new-journal"
-                  onClick={() => {
-                    handleNewJournal();
-                    setActivePage('journal');
-                  }}
-                  className="flex items-center space-x-2 px-4 py-2.5 bg-[#2D5A43] hover:bg-[#234735] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Nouveau Journal du Jour</span>
-                </button>
-
-                <button
-                  id="btn-history-goto-gains"
-                  onClick={() => setActivePage('gains_summary')}
-                  className="flex items-center space-x-2 px-3.5 py-2.5 bg-[#F4F1EA] hover:bg-[#EBE8E0] text-[#2D5A43] rounded-xl text-xs font-bold border border-[#DCD6CB] transition-all cursor-pointer"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Voir Synthèse & Gains →</span>
-                </button>
-              </div>
-            </div>
-
             {/* Full Journal History List with Multi-Select & Search */}
             <JournalHistoryList
               journals={activeBakeryJournals}

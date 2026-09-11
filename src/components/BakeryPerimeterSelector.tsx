@@ -5,13 +5,10 @@ import {
   ChevronDown, 
   Plus, 
   TrendingUp, 
-  Receipt, 
-  Layers, 
   Calendar, 
   Check, 
   ArrowRight,
   UserCheck,
-  Building2,
   Trash2
 } from 'lucide-react';
 import { formatDateFrench, formatCurrency } from '../utils/calculations';
@@ -117,13 +114,7 @@ export const BakeryPerimeterSelector: React.FC<BakeryPerimeterSelectorProps> = (
         >
           {/* Header */}
           <div className="p-3.5 sm:p-4 bg-white border-b border-[#DCD6CB]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Building2 className="w-4 h-4 text-[#2D5A43]" />
-                <span className="text-xs font-bold font-editorial uppercase tracking-wider text-[#2D5A43]">
-                  Périmètre de Caisse & Gains
-                </span>
-              </div>
+            <div className="flex items-center justify-end">
               <span className="text-[10px] font-mono-num font-bold px-1.5 py-0.5 rounded-full bg-[#E7EFEA] text-[#2D5A43] border border-[#C3D9CD]">
                 {bakeries.length} {bakeries.length > 1 ? 'boulangeries' : 'boulangerie'}
               </span>
@@ -134,7 +125,7 @@ export const BakeryPerimeterSelector: React.FC<BakeryPerimeterSelectorProps> = (
           </div>
 
           {/* Quick Action Buttons */}
-          <div className="p-3 bg-[#F4F1EA] border-b border-[#DCD6CB] grid grid-cols-2 gap-2">
+          <div className="p-3 bg-[#F4F1EA] border-b border-[#DCD6CB]">
             <button
               type="button"
               id="btn-quick-add-bakery"
@@ -142,23 +133,10 @@ export const BakeryPerimeterSelector: React.FC<BakeryPerimeterSelectorProps> = (
                 setIsOpen(false);
                 onOpenAddBakeryModal();
               }}
-              className="flex items-center justify-center space-x-1.5 px-2.5 py-2 bg-white hover:bg-[#EBE8E0] text-[#1A1A1A] border border-[#DCD6CB] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer text-center"
+              className="w-full flex items-center justify-center space-x-1.5 px-2.5 py-2 bg-white hover:bg-[#EBE8E0] text-[#1A1A1A] border border-[#DCD6CB] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer text-center"
             >
               <Plus className="w-3.5 h-3.5 text-[#2D5A43]" />
               <span className="truncate">Nouv. Boulanger</span>
-            </button>
-
-            <button
-              type="button"
-              id="btn-quick-new-journal-for-active"
-              onClick={() => {
-                setIsOpen(false);
-                onNewJournalForActiveBakery();
-              }}
-              className="flex items-center justify-center space-x-1.5 px-2.5 py-2 bg-[#2D5A43] hover:bg-[#234735] text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer text-center"
-            >
-              <Receipt className="w-3.5 h-3.5" />
-              <span className="truncate">Nouv. Journal</span>
             </button>
           </div>
 
@@ -167,36 +145,6 @@ export const BakeryPerimeterSelector: React.FC<BakeryPerimeterSelectorProps> = (
             <div className="px-2 py-1 text-[10px] font-bold text-[#7A756D] uppercase tracking-wider font-editorial">
               Choisir une boulangerie
             </div>
-
-            {/* All Bakeries Option */}
-            <button
-              type="button"
-              onClick={() => {
-                onSelectBakery('all');
-                setIsOpen(false);
-              }}
-              className={`w-full text-left p-2.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                isAllSelected 
-                  ? 'bg-white border border-[#2D5A43] shadow-xs' 
-                  : 'hover:bg-white border border-transparent'
-              }`}
-            >
-              <div className="flex items-center space-x-2.5">
-                <div className="w-6 h-6 rounded-lg bg-[#5C574F] text-white flex items-center justify-center text-xs shadow-2xs shrink-0">
-                  <Layers className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-[#1A1A1A] flex items-center gap-1.5">
-                    <span>Toutes les boulangeries</span>
-                    <span className="text-[10px] px-1 py-0.2 rounded bg-[#EBE8E0] text-[#5C574F]">Vue globale</span>
-                  </div>
-                  <span className="text-[10px] text-[#7A756D]">
-                    {journals.length} journaux au total
-                  </span>
-                </div>
-              </div>
-              {isAllSelected && <Check className="w-4 h-4 text-[#2D5A43]" />}
-            </button>
 
             {/* Specific Bakeries */}
             {bakeries.map((b) => {

@@ -11,9 +11,6 @@ import {
   Users, 
   Plus, 
   Trash2, 
-  RotateCcw, 
-  Download, 
-  Upload, 
   CheckCircle2, 
   HelpCircle,
   Calculator,
@@ -53,16 +50,16 @@ interface SettingsPageProps {
   settings: AppSettings;
   onSaveSettings: (settings: AppSettings) => void;
   journals: DailyJournal[];
-  onImportJournals: (journals: DailyJournal[]) => void;
-  onResetAllData: () => void;
+  onImportJournals?: (journals: DailyJournal[]) => void;
+  onResetAllData?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   settings,
   onSaveSettings,
   journals,
-  onImportJournals,
-  onResetAllData,
+  onImportJournals: _onImportJournals,
+  onResetAllData: _onResetAllData,
 }) => {
   const { formattedDateLong, timeStr, refreshNow, now } = useLiveDateTime();
   const [formData, setFormData] = useState<AppSettings>(settings);
@@ -73,7 +70,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [showAddSellerForm, setShowAddSellerForm] = useState(false);
   const [sellerSyncNotice, setSellerSyncNotice] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
   const [justSyncedTime, setJustSyncedTime] = useState(false);
   const [profileLogo, setProfileLogo] = useState<string>(() => {
     return localStorage.getItem('app_custom_profile_logo') || defaultStoreLogo;
@@ -257,47 +253,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       }),
     }));
     setShowAddSellerForm(true);
-  };
-
-  const handleExportBackup = () => {
-    const backup = {
-      version: 2,
-      exportDate: new Date().toISOString(),
-      settings: formData,
-      journals,
-    };
-
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backup, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `sauvegarde_caisse_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
-
-  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileReader = new FileReader();
-    if (e.target.files && e.target.files[0]) {
-      fileReader.readAsText(e.target.files[0], 'UTF-8');
-      fileReader.onload = (event) => {
-        try {
-          const parsed = JSON.parse(event.target?.result as string);
-          if (parsed && Array.isArray(parsed.journals)) {
-            onImportJournals(parsed.journals);
-            if (parsed.settings) {
-              setFormData(parsed.settings);
-              onSaveSettings(parsed.settings);
-            }
-            alert('Sauvegarde restaurée avec succès !');
-          } else {
-            setImportError('Format de fichier invalide. Le fichier doit contenir une liste de journaux.');
-          }
-        } catch {
-          setImportError('Erreur lors de la lecture du fichier JSON.');
-        }
-      };
-    }
   };
 
   return (
@@ -601,19 +556,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <span className="text-[11px] text-[#7A756D] mt-1 block font-editorial italic">Exemple dans le cahier : 50 CFA</span>
             </div>
           </div>
-
-          {/* Return Loss Auto-Calc Visual Summary in Settings */}
-          <div className="bg-[#FAF3E8] border border-[#E8D9C0] rounded-xl p-3 text-xs text-[#9C6B28] flex items-center justify-between">
-            <div>
-              <strong className="text-[#1A1A1A]">Formule automatique des retours :</strong>
-              <span className="ml-1 font-mono-num font-semibold">
-                (Retour × {formData.defaultSellingPrice}) - (Retour × {formData.defaultReturnPrice}) = {Math.max(0, formData.defaultSellingPrice - formData.defaultReturnPrice)} {formData.currency} de perte / pain de retour
-              </span>
-            </div>
-            <span className="bg-[#E8D9C0] text-[#78511A] px-2 py-0.5 rounded font-bold font-mono-num shrink-0">
-              -{Math.max(0, formData.defaultSellingPrice - formData.defaultReturnPrice)} {formData.currency} / unité
-            </span>
-          </div>
         </div>
 
         {/* 3. Identification & Équipe des Vendeurs / Personnel */}
@@ -811,43 +753,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
       </form>
 
-      {/* 4. Profil Utilisateur, Connexion Facebook / Microsoft & Synchronisation Cloud */}
-      <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-5 shadow-xs space-y-4" id="settings-social-cloud-card">
-        <div className="flex items-center space-x-2 border-b border-[#EBE8E0] pb-3">
-          <div className="flex items-center gap-1.5">
-            <svg className="w-5 h-5 shrink-0 fill-[#1877F2]" viewBox="0 0 24 24">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 21 21">
-              <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-              <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-              <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-              <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="font-bold text-[#1A1A1A] font-editorial text-base">
-              Profil Utilisateur, Facebook, Microsoft & Synchronisation Cloud
-            </h3>
-            <p className="text-[11px] text-[#7A756D] font-editorial italic">
-              Connectez votre compte Facebook ou Microsoft (Outlook, Office 365) pour afficher votre logo de profil et sauvegarder tous vos journaux en ligne
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-[#F4F1EA] border border-[#DCD6CB] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h4 className="font-bold text-sm text-[#1A1A1A]">
-              Logo de profil & sauvegarde automatique multi-appareils
-            </h4>
-            <p className="text-xs text-[#5C574F]">
-              En vous connectant avec Facebook ou Microsoft, votre photo de profil s&apos;affiche directement dans la barre d&apos;en-tête et tous vos journaux de caisse sont automatiquement synchronisés sur Firestore.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Enregistrement Automatique sur le PC (Dossier Documents) */}
+      {/* 4. Enregistrement Automatique sur le PC (Dossier Documents) */}
       <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-5 shadow-xs space-y-4" id="settings-pc-folder-card">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#EBE8E0] pb-3">
           <div className="flex items-center space-x-2">
@@ -942,66 +848,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <button onClick={() => setFolderSyncMsg(null)} className="text-xs opacity-60 hover:opacity-100 font-bold px-1">✕</button>
           </div>
         )}
-      </div>
-
-      {/* 5. Sauvegarde & Restauration des Données */}
-      <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-5 shadow-xs space-y-4">
-        <div className="flex items-center space-x-2 border-b border-[#EBE8E0] pb-3">
-          <Download className="w-5 h-5 text-[#5C574F]" />
-          <h3 className="font-bold text-[#1A1A1A] font-editorial text-base">
-            Sauvegarde, Sécurité & Réinitialisation
-          </h3>
-        </div>
-
-        <p className="text-xs text-[#7A756D] font-editorial italic">
-          Vos journaux sont stockés en sécurité directement dans votre navigateur. Vous pouvez exporter une sauvegarde sur votre ordinateur ou téléphone à tout moment.
-        </p>
-
-        {importError && (
-          <div className="p-3 bg-[#F8EDED] border border-[#E8C0C0] rounded-xl text-xs text-[#8B3A3A] font-semibold">
-            {importError}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-          
-          {/* Export JSON */}
-          <button
-            type="button"
-            onClick={handleExportBackup}
-            className="flex items-center justify-center space-x-2 bg-[#EBE8E0] hover:bg-[#DCD6CB] border border-[#DCD6CB] p-3 rounded-xl text-xs font-semibold text-[#1A1A1A] transition-colors"
-          >
-            <Download className="w-4 h-4 text-[#5C574F]" />
-            <span>Télécharger Sauvegarde (JSON)</span>
-          </button>
-
-          {/* Import JSON */}
-          <label className="flex items-center justify-center space-x-2 bg-[#EBE8E0] hover:bg-[#DCD6CB] border border-[#DCD6CB] p-3 rounded-xl text-xs font-semibold text-[#1A1A1A] transition-colors cursor-pointer">
-            <Upload className="w-4 h-4 text-[#5C574F]" />
-            <span>Restaurer une Sauvegarde</span>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImportBackup}
-              className="hidden"
-            />
-          </label>
-
-          {/* Reset to Demo */}
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm('Voulez-vous recharger les données types d’exemple (comme dans l’image Excel) ?')) {
-                onResetAllData();
-              }
-            }}
-            className="flex items-center justify-center space-x-2 bg-[#F8EDED] hover:bg-[#F3DDDD] border border-[#E8C0C0] p-3 rounded-xl text-xs font-semibold text-[#8B3A3A] transition-colors"
-          >
-            <RotateCcw className="w-4 h-4 text-[#8B3A3A]" />
-            <span>Réinitialiser Données Démo</span>
-          </button>
-
-        </div>
       </div>
 
     </div>

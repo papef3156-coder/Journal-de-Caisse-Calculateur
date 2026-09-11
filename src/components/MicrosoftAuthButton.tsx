@@ -294,46 +294,7 @@ export const MicrosoftAuthButton: React.FC<MicrosoftAuthButtonProps> = ({
     <div className="relative">
       {!user ? (
         <div className="flex items-center gap-1 sm:gap-1.5">
-          {/* 1. Quick Facebook Login Button */}
-          <button
-            id="btn-facebook-signin"
-            onClick={handleSignInFacebook}
-            disabled={loading !== null}
-            className="hidden md:inline-flex items-center space-x-1.5 bg-[#1877F2] hover:bg-[#166FE5] active:bg-[#125EC4] text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold transition-all shadow-2xs cursor-pointer"
-            title="Se connecter avec Facebook"
-          >
-            {loading === 'facebook' ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
-            ) : (
-              <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-            )}
-            <span>Facebook</span>
-          </button>
-
-          {/* 2. Quick Microsoft Login Button */}
-          <button
-            id="btn-microsoft-signin"
-            onClick={handleSignInMicrosoft}
-            disabled={loading !== null}
-            className="hidden sm:inline-flex items-center space-x-1.5 bg-white hover:bg-[#F3F2F1] active:bg-[#EDEBE9] text-[#1A1A1A] border border-[#DCD6CB] hover:border-[#0078D4] px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold transition-all shadow-2xs cursor-pointer"
-            title="Se connecter avec Microsoft"
-          >
-            {loading === 'microsoft' ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#0078D4]" />
-            ) : (
-              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 21 21">
-                <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-                <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-                <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-                <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-              </svg>
-            )}
-            <span>Microsoft</span>
-          </button>
-
-          {/* 3. Distinct Profile Logo Button (Opens Profile & Accounts Menu) */}
+          {/* Distinct Profile Logo Button (Opens Profile & Accounts Menu) */}
           <button
             id="btn-profile-logo-menu"
             type="button"

@@ -145,19 +145,6 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
       {/* Header & Quick stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#EBE8E0]">
         <div className="flex items-center gap-3">
-          {onBackToEditor && (
-            <button
-              type="button"
-              onClick={onBackToEditor}
-              id="btn-history-back-to-editor"
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-[#EBE8E0] text-[#2D5A43] border border-[#DCD6CB] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0"
-              title="Retourner à la saisie du journal de caisse (Touche Échap / Esc)"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Retour au journal</span>
-              <kbd className="text-[10px] font-mono bg-[#FAFAF7] border border-[#DCD6CB] px-1.5 py-0.5 rounded text-[#7A756D] font-bold shadow-2xs">Esc</kbd>
-            </button>
-          )}
           <div>
             <h3 className="font-bold text-[#1A1A1A] font-editorial text-lg flex items-center gap-2">
               <Calendar className="w-5 h-5 text-[#2D5A43]" />
@@ -235,7 +222,7 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
         </div>
       )}
 
-      {/* Filters Bar & Select All */}
+      {/* Filters Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 text-[#8C877E] absolute left-3 top-2.5" />
@@ -260,27 +247,6 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
             </option>
           ))}
         </select>
-
-        {filteredJournals.length > 0 && (
-          <button
-            type="button"
-            onClick={handleToggleSelectAll}
-            className="flex items-center space-x-1 px-3 py-2 bg-[#F4F1EA] hover:bg-[#EBE8E0] border border-[#DCD6CB] text-[#4A463F] rounded-xl text-xs font-semibold transition-colors shrink-0 cursor-pointer"
-            title="Sélectionner ou désélectionner tous les journaux filtrés"
-          >
-            {selectedIds.size === filteredJournals.length ? (
-              <>
-                <CheckSquare className="w-3.5 h-3.5 text-[#2D5A43]" />
-                <span>Tout désélectionner</span>
-              </>
-            ) : (
-              <>
-                <Square className="w-3.5 h-3.5 text-[#7A756D]" />
-                <span>Tout sélectionner</span>
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* List of Journals */}
