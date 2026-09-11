@@ -7,14 +7,11 @@ import {
   Search, 
   Trash2, 
   Edit3, 
-  Printer,
-  CheckSquare,
-  Square,
-  TrendingUp,
-  AlertTriangle,
-  ArrowLeft,
-  Check,
-  X
+  CheckSquare, 
+  Square, 
+  AlertTriangle, 
+  Check, 
+  X 
 } from 'lucide-react';
 
 interface JournalHistoryListProps {
@@ -27,6 +24,9 @@ interface JournalHistoryListProps {
   onPrintJournal: (journal: DailyJournal) => void;
   onSaveJournal?: (journal: DailyJournal) => void;
   onBackToEditor?: () => void;
+  onSyncCloud?: () => Promise<void>;
+  isCloudSyncing?: boolean;
+  onViewSynthesis?: (journal: DailyJournal) => void;
 }
 
 export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
@@ -39,9 +39,11 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
   onPrintJournal,
   onSaveJournal,
   onBackToEditor,
+  onSyncCloud,
+  isCloudSyncing,
+  onViewSynthesis,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [journalToDelete, setJournalToDelete] = useState<DailyJournal | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
@@ -65,11 +67,6 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [journalToDelete, showBatchDeleteModal, onBackToEditor]);
 
-  // Extract unique months from journals
-  const availableMonths = Array.from(
-    new Set(journals.map((j) => j.date.substring(0, 7)))
-  ).sort().reverse();
-
   // Filter journals
   const filteredJournals = useMemo(() => {
     return journals.filter((j) => {
@@ -78,26 +75,9 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
         (j.notes && j.notes.toLowerCase().includes(searchTerm.toLowerCase())) ||
         j.sellers.some((s) => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesMonth = selectedMonth === 'all' || j.date.startsWith(selectedMonth);
-
-      return matchesSearch && matchesMonth;
+      return matchesSearch;
     });
-  }, [journals, searchTerm, selectedMonth]);
-
-  // Aggregate stats for filtered list
-  const aggregateStats = useMemo(() => {
-    return filteredJournals.reduce(
-      (acc, j) => {
-        acc.totalGiven += j.summary?.totalProducedOrGiven || 0;
-        acc.totalSold += j.summary?.totalSold || 0;
-        acc.totalReturned += j.summary?.totalReturned || 0;
-        acc.totalRevenue += j.summary?.grossRevenue || 0;
-        acc.totalNetGain += j.summary?.netGain || 0;
-        return acc;
-      },
-      { totalGiven: 0, totalSold: 0, totalReturned: 0, totalRevenue: 0, totalNetGain: 0 }
-    );
-  }, [filteredJournals]);
+  }, [journals, searchTerm]);
 
   const handleToggleSelectAll = () => {
     if (selectedIds.size === filteredJournals.length && filteredJournals.length > 0) {
@@ -144,62 +124,40 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
       
       {/* Header & Quick stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#EBE8E0]">
-        <div className="flex items-center gap-3">
-          <div>
-            <h3 className="font-bold text-[#1A1A1A] font-editorial text-lg flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-[#2D5A43]" />
-              <span>Historique des Journaux Enregistrés</span>
-            </h3>
-            <p className="text-xs text-[#7A756D] font-editorial italic mt-0.5">
-              {journals.length} {journals.length > 1 ? 'journaux de caisse archivés' : 'journal de caisse archivé'} au total
-            </p>
-          </div>
+        <div>
+          <h3 className="font-bold text-[#1A1A1A] font-editorial text-lg flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-[#2D5A43]" />
+            <span>Historique des Journaux Enregistrés</span>
+          </h3>
+          <p className="text-xs text-[#7A756D] font-editorial italic mt-0.5">
+            {journals.length} {journals.length > 1 ? 'journaux de caisse archivés' : 'journal de caisse archivé'} au total
+          </p>
         </div>
 
-        {/* Batch action buttons if selected */}
-        {selectedIds.size > 0 && (
-          <div className="flex items-center space-x-2 animate-fadeIn">
-            <button
-              type="button"
-              id="btn-delete-selection"
-              onClick={() => setShowBatchDeleteModal(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#8B3A3A] hover:bg-[#732A2A] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Supprimer la sélection ({selectedIds.size})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="px-2.5 py-1.5 bg-[#EBE8E0] hover:bg-[#DCD6CB] text-[#4A463F] rounded-xl text-xs font-semibold cursor-pointer"
-            >
-              Annuler
-            </button>
-          </div>
-        )}
+        {/* Header Right Actions : Batch delete if selected */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectedIds.size > 0 && (
+            <div className="flex items-center space-x-2 animate-fadeIn">
+              <button
+                type="button"
+                id="btn-delete-selection"
+                onClick={() => setShowBatchDeleteModal(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#8B3A3A] hover:bg-[#732A2A] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Supprimer la sélection ({selectedIds.size})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="px-2.5 py-1.5 bg-[#EBE8E0] hover:bg-[#DCD6CB] text-[#4A463F] rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Annuler
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Aggregate KPI Strip */}
-      {filteredJournals.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <div className="bg-[#F4F1EA] p-2.5 rounded-xl border border-[#DCD6CB]">
-            <span className="text-[11px] text-[#7A756D] block font-editorial">Journaux affichés</span>
-            <span className="text-sm font-bold text-[#1A1A1A] font-mono-num">{filteredJournals.length}</span>
-          </div>
-          <div className="bg-[#F4F1EA] p-2.5 rounded-xl border border-[#DCD6CB]">
-            <span className="text-[11px] text-[#7A756D] block font-editorial">Total Pains Confiés</span>
-            <span className="text-sm font-bold text-[#1A1A1A] font-mono-num">{formatNumber(aggregateStats.totalGiven)}</span>
-          </div>
-          <div className="bg-[#E7EFEA] p-2.5 rounded-xl border border-[#C3D9CD]">
-            <span className="text-[11px] text-[#2D5A43] block font-editorial font-semibold">Chiffre d'Affaires</span>
-            <span className="text-sm font-bold text-[#2D5A43] font-mono-num">{formatCurrency(aggregateStats.totalRevenue, currency)}</span>
-          </div>
-          <div className="bg-[#2D5A43] p-2.5 rounded-xl border border-[#234735] text-white">
-            <span className="text-[11px] text-[#D8EADB] block font-editorial font-semibold">Bénéfice Net Cumulé</span>
-            <span className="text-sm font-bold text-white font-mono-num">{formatCurrency(aggregateStats.totalNetGain, currency)}</span>
-          </div>
-        </div>
-      )}
 
       {/* Feedback Message */}
       {syncStatusMsg && (
@@ -223,7 +181,7 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
       )}
 
       {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
+      <div className="flex items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 text-[#8C877E] absolute left-3 top-2.5" />
           <input
@@ -234,19 +192,6 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
             className="w-full bg-[#F4F1EA] border border-[#DCD6CB] rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-[#1A1A1A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D5A43]"
           />
         </div>
-
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="bg-[#F4F1EA] border border-[#DCD6CB] rounded-xl px-3 py-2 text-xs font-semibold text-[#1A1A1A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D5A43] w-full sm:w-auto"
-        >
-          <option value="all">Tous les mois</option>
-          {availableMonths.map((m) => (
-            <option key={m} value={m}>
-              Mois {m}
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* List of Journals */}
@@ -333,11 +278,12 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
                       </span>
                       <span className="text-[#9C6B28]">
                         Retours : <strong className="font-mono-num">{formatNumber(journal.summary?.totalReturned ?? 0)}</strong>
-                        {(journal.summary?.totalReturned ?? 0) > 0 && (
-                          <span className="text-[#8B3A3A] text-[11px] ml-1">
-                            (-{formatCurrency(journal.summary?.returnLossAmount || ((journal.summary?.totalReturned ?? 0) * (journal.unitSellingPrice - journal.unitReturnPrice)), currency)})
-                          </span>
-                        )}
+                      </span>
+                      <span className="text-[#4A463F]">
+                        Prix Vente : <strong className="text-[#1A1A1A] font-mono-num">{journal.unitSellingPrice || 175} {currency}</strong>
+                      </span>
+                      <span className="text-[#8B3A3A]">
+                        Dépenses : <strong className="font-mono-num">{formatCurrency(journal.summary?.totalExpenses ?? 0, currency)}</strong>
                       </span>
                       <span>• {(journal.sellers || []).length} vendeurs</span>
                     </div>
@@ -353,28 +299,20 @@ export const JournalHistoryList: React.FC<JournalHistoryListProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     <button
                       onClick={() => onSelectJournal(journal)}
                       title="Ouvrir et modifier ce journal dans l'éditeur"
-                      className="p-2 text-[#5C574F] hover:text-[#2D5A43] hover:bg-[#FAFAF7] rounded-lg border border-transparent hover:border-[#DCD6CB] transition-colors cursor-pointer"
+                      className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center text-[#5C574F] hover:text-[#2D5A43] bg-[#FAFAF7] hover:bg-[#EBE8E0] rounded-xl border border-[#DCD6CB] transition-all active:scale-95 cursor-pointer shadow-2xs"
                     >
                       <Edit3 className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={() => onPrintJournal(journal)}
-                      title="Imprimer le ticket"
-                      className="p-2 text-[#5C574F] hover:text-[#1A1A1A] hover:bg-[#FAFAF7] rounded-lg border border-transparent hover:border-[#DCD6CB] transition-colors cursor-pointer"
-                    >
-                      <Printer className="w-4 h-4" />
                     </button>
 
                     <button
                       id={`btn-delete-journal-${journal.id}`}
                       onClick={() => setJournalToDelete(journal)}
                       title="Supprimer définitivement ce journal"
-                      className="p-2 text-[#8C877E] hover:text-[#8B3A3A] hover:bg-[#FDF2E9] rounded-lg border border-transparent hover:border-[#FADBD8] transition-colors cursor-pointer"
+                      className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center text-[#8B3A3A] hover:text-[#C5221F] bg-[#FDF2E9] hover:bg-[#FCE8E6] rounded-xl border border-[#FADBD8] transition-all active:scale-95 cursor-pointer shadow-2xs"
                     >
                       <Trash2 className="w-4 h-4 text-[#8B3A3A]" />
                     </button>

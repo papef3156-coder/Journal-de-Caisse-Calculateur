@@ -1,115 +1,139 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ActivePage, AppSettings, DailyJournal, TimePeriod, SellerEntry, BakeryBranch } from './types';
+import React, { useState, useEffect } from 'react';
+import { ActivePage, AppSettings, DailyJournal, SellerEntry, BakeryBranch, TimePeriod } from './types';
 import { 
   loadJournals, 
   loadSettings, 
   saveJournals, 
   saveSettings, 
-  DEFAULT_SETTINGS, 
   getInitialSellers,
   loadBakeries,
   saveBakeries,
   loadActiveBakeryId,
-  saveActiveBakeryId
+  saveActiveBakeryId,
 } from './utils/storage';
 import { calculateJournalSummary } from './utils/calculations';
 import { getLocalDateString, useLiveDateTime } from './utils/dateTime';
 import { Header } from './components/Header';
-import { ProfitMetricCards } from './components/ProfitMetricCards';
 import { DailyJournalEditor } from './components/DailyJournalEditor';
-import { AnalyticsCharts } from './components/AnalyticsCharts';
-import { JournalHistoryList } from './components/JournalHistoryList';
 import { GainsAndSummaryPage } from './components/GainsAndSummaryPage';
+import { JournalHistoryList } from './components/JournalHistoryList';
 import { SettingsPage } from './components/SettingsPage';
+import { AndroidBottomNav } from './components/AndroidBottomNav';
 import { ReceiptModal } from './components/ReceiptModal';
 import { AddBakeryModal } from './components/AddBakeryModal';
-import { autoSaveMonthlyProfitRecords } from './utils/monthlyRecords';
-import { auth, saveJournalToCloud, saveSettingsToCloud, deleteJournalFromCloud, loadJournalsFromCloud } from './utils/firebase';
+import { FirebaseMultiAppSyncModal } from './components/FirebaseMultiAppSyncModal';
+import { 
+  auth, 
+  ensureAuthUser, 
+  signInWithGoogle,
+  saveJournalToCloud, 
+  deleteJournalFromCloud, 
+  loadJournalsFromCloud, 
+  syncAllJournalsToCloud,
+  subscribeToCloudJournals
+} from './utils/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { 
-  Calculator, 
-  BarChart3, 
-  History, 
   PlusCircle, 
-  CalendarDays,
-  Sparkles,
-  TrendingUp,
   Calendar,
-  Crown,
-  CheckCircle2,
-  AlertCircle,
-  X
+  Users,
+  X,
+  ShieldCheck,
+  ArrowRightLeft
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { SubscriptionModal } from './components/SubscriptionModal';
-import { SubscriptionPage } from './components/SubscriptionPage';
-import { PhoneAuthModal } from './components/PhoneAuthModal';
-import { UserSubscription, PaymentTransaction, PaymentConfig, PhoneAccount } from './types';
-import { fetchSubscriptionStatus, fetchPaymentConfig, verifyPayment, fetchPhoneAccount } from './utils/subscriptionApi';
 
 export default function App() {
-  const [activePage, setActivePage] = useState<ActivePage>('dashboard');
-  const [dashboardTab, setDashboardTab] = useState<'editor' | 'charts' | 'history'>('editor');
+  const [activePage, setActivePage] = useState<ActivePage>('journal');
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [journals, setJournals] = useState<DailyJournal[]>(loadJournals);
   const [bakeries, setBakeries] = useState<BakeryBranch[]>(loadBakeries);
   const [activeBakeryId, setActiveBakeryId] = useState<string>(loadActiveBakeryId);
   const [isAddBakeryModalOpen, setIsAddBakeryModalOpen] = useState<boolean>(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('7days');
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('today');
   const [activePrintJournal, setActivePrintJournal] = useState<DailyJournal | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
+  const [isMultiAppModalOpen, setIsMultiAppModalOpen] = useState<boolean>(false);
+  const [dismissGoogleBanner, setDismissGoogleBanner] = useState<boolean>(() => {
+    return localStorage.getItem('dismiss_google_sync_banner') === 'true';
+  });
 
-  // Phone Account & Subscription state
-  const [phoneAccount, setPhoneAccount] = useState<PhoneAccount | null>(null);
-  const [isPhoneAuthModalOpen, setIsPhoneAuthModalOpen] = useState<boolean>(false);
-  const [phoneAuthInitialMode, setPhoneAuthInitialMode] = useState<'register' | 'login'>('register');
+  const { todayStr: liveTodayStr } = useLiveDateTime();
 
-  const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState<boolean>(false);
-  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
-  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
-  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
-  const [paymentBanner, setPaymentBanner] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-
-  // Restore phone account from storage on load
+  // Listen to Auth state and synchronise with Cloud Firestore
   useEffect(() => {
-    const savedUserId = localStorage.getItem('phone_user_id');
-    if (savedUserId) {
-      fetchPhoneAccount(savedUserId)
-        .then((acc) => {
-          if (acc) setPhoneAccount(acc);
-        })
-        .catch((e) => console.warn('Restore phone account error:', e));
-    }
-  }, []);
+    ensureAuthUser().catch(() => {});
+    let unsubSnapshot: (() => void) | null = null;
 
-  // Listen to Auth state (Microsoft / Cloud)
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (unsubSnapshot) {
+        unsubSnapshot();
+        unsubSnapshot = null;
+      }
+
       if (user) {
-        // Automatically sync from cloud
-        const cloudData = await loadJournalsFromCloud(user.uid);
-        if (cloudData && cloudData.length > 0) {
-          setJournals(cloudData);
+        setIsCloudSyncing(true);
+        try {
+          const cloudData = await loadJournalsFromCloud(user.uid);
+          if (cloudData && cloudData.length > 0) {
+            setJournals((prev) => {
+              const cloudMap = new Map(cloudData.map((j) => [j.id || j.date, j]));
+              const merged = [...cloudData];
+              for (const loc of prev) {
+                const key = loc.id || loc.date;
+                if (!cloudMap.has(key)) {
+                  merged.push(loc);
+                }
+              }
+              return merged.sort((a, b) => b.date.localeCompare(a.date));
+            });
+          } else {
+            const localData = loadJournals();
+            if (localData && localData.length > 0) {
+              await syncAllJournalsToCloud(user.uid, localData);
+            }
+          }
+
+          // Abonnement en temps réel pour synchroniser instantanément avec l'autre application (GitHub Pages)
+          unsubSnapshot = subscribeToCloudJournals(user.uid, (realtimeData) => {
+            if (realtimeData && realtimeData.length > 0) {
+              setJournals((prev) => {
+                const cloudMap = new Map(realtimeData.map((j) => [j.id || j.date, j]));
+                const merged = [...realtimeData];
+                for (const loc of prev) {
+                  const key = loc.id || loc.date;
+                  if (!cloudMap.has(key)) {
+                    merged.push(loc);
+                  }
+                }
+                return merged.sort((a, b) => b.date.localeCompare(a.date));
+              });
+            }
+          });
+        } catch (err) {
+          console.warn('Cloud load error:', err);
+        } finally {
+          setIsCloudSyncing(false);
         }
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      if (unsubSnapshot) unsubSnapshot();
+    };
   }, []);
 
-  // Global Escape (Échap) key handler: closes receipt/bakery/auth/subscription modals or returns to journal page
+  // Global Escape key handler
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (activePrintJournal) {
           setActivePrintJournal(null);
-        } else if (isAddBakeryModalOpen) {
-          setIsAddBakeryModalOpen(false);
-        } else if (isSubscribeModalOpen) {
-          setIsSubscribeModalOpen(false);
-        } else if (isPhoneAuthModalOpen) {
-          setIsPhoneAuthModalOpen(false);
-        } else if (activePage !== 'journal' && activePage !== 'dashboard') {
+        } else if (activePage !== 'journal') {
           setActivePage('journal');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -117,132 +141,16 @@ export default function App() {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activePrintJournal, isAddBakeryModalOpen, isSubscribeModalOpen, isPhoneAuthModalOpen, activePage]);
+  }, [activePrintJournal, activePage]);
 
-  const getEffectiveUserId = (): string => {
-    if (phoneAccount) return phoneAccount.userId;
-    const savedPhoneUserId = localStorage.getItem('phone_user_id');
-    if (savedPhoneUserId) return savedPhoneUserId;
-    if (currentUser) return currentUser.uid;
-    let localUid = localStorage.getItem('journal_local_uid');
-    if (!localUid) {
-      localUid = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      localStorage.setItem('journal_local_uid', localUid);
-    }
-    return localUid;
-  };
-
-  const loadSubscriptionData = async () => {
-    try {
-      const uid = getEffectiveUserId();
-      const data = await fetchSubscriptionStatus(uid);
-      setSubscription(data.subscription);
-      setTransactions(data.transactions);
-    } catch (err) {
-      console.warn('Subscription fetch error:', err);
-    }
-  };
-
-  const handleOpenPhoneAuthModal = (mode: 'register' | 'login' = 'register') => {
-    setPhoneAuthInitialMode(mode);
-    setIsPhoneAuthModalOpen(true);
-  };
-
-  const handlePhoneAuthSuccess = (account: PhoneAccount) => {
-    setPhoneAccount(account);
-    localStorage.setItem('phone_user_id', account.userId);
-    localStorage.setItem('user_contact_phone', account.displayPhone);
-    loadSubscriptionData();
-    confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-    setPaymentBanner({
-      type: 'success',
-      message: `Bienvenue ${account.displayName} ! Votre compte a été configuré avec vos 7 jours d'essai gratuit.`
-    });
-  };
-
-  const handleLogoutPhoneAccount = () => {
-    localStorage.removeItem('phone_user_id');
-    setPhoneAccount(null);
-    loadSubscriptionData();
-  };
-
-  // Load payment config and subscription data
-  useEffect(() => {
-    fetchPaymentConfig()
-      .then(cfg => setPaymentConfig(cfg))
-      .catch(err => console.warn('Config fetch error:', err));
-    loadSubscriptionData();
-  }, [currentUser]);
-
-  // Handle return URLs from Wave / Orange Money callbacks
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const paymentStatus = urlParams.get('payment_status');
-    const txId = urlParams.get('tx_id') || urlParams.get('order_id');
-    const sessionId = urlParams.get('session_id');
-    const provider = urlParams.get('provider');
-    const sandboxPrompt = urlParams.get('sandbox_prompt');
-
-    if (sandboxPrompt) {
-      setIsSubscribeModalOpen(true);
-    }
-
-    if (paymentStatus && txId) {
-      if (paymentStatus === 'success' || paymentStatus === 'return') {
-        verifyPayment(txId, sessionId || undefined, undefined, provider || undefined)
-          .then((res) => {
-            if (res.success) {
-              confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-              setPaymentBanner({
-                type: 'success',
-                message: "Paiement validé avec succès ! Votre abonnement Premium de 5 000 FCFA a été activé pour 1 mois."
-              });
-              loadSubscriptionData();
-            }
-          })
-          .catch((err) => {
-            setPaymentBanner({
-              type: 'error',
-              message: err.message || "Impossible de confirmer le paiement. Vérifiez votre solde ou contactez le support."
-            });
-          })
-          .finally(() => {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          });
-      } else if (paymentStatus === 'cancelled') {
-        setPaymentBanner({
-          type: 'error',
-          message: "Le paiement a été annulé par l'utilisateur."
-        });
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
-  }, [currentUser]);
-
-  const { todayStr: liveTodayStr } = useLiveDateTime();
-
-  // Helper to create a new daily journal for any given date and bakery
-  const createNewJournalForDate = (
-    dateStr: string,
-    existingJournals: DailyJournal[],
-    targetBakery?: BakeryBranch
-  ): DailyJournal => {
-    const activeTarget = targetBakery || bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
-    const targetBakeryId = activeTarget?.id || 'boulangerie-principale';
-    const targetBakeryName = activeTarget?.name || 'Boulangerie Principale';
-    const sellingPrice = activeTarget?.defaultSellingPrice || settings.defaultSellingPrice;
-    const returnPrice = activeTarget?.defaultReturnPrice || settings.defaultReturnPrice;
-    const costPrice = activeTarget?.defaultCostPrice || settings.defaultCostPrice;
-    const prodName = activeTarget?.defaultProductName || settings.defaultProductName;
-
-    // Inherit sellers and contact numbers from the most recent journal of THIS bakery if exists
-    const previousBakeryJournals = existingJournals.filter((j) => (j.bakeryId || 'boulangerie-principale') === targetBakeryId);
-    const latestWithSellers = previousBakeryJournals.find((j) => j.sellers && j.sellers.length > 0) || existingJournals.find((j) => j.sellers && j.sellers.length > 0);
+  // Helper to create a new daily journal for any given date
+  const createNewJournalForDate = (dateStr: string, existingJournals: DailyJournal[]): DailyJournal => {
+    const latestWithSellers = existingJournals.find((j) => j.sellers && j.sellers.length > 0);
     let sellersToUse: SellerEntry[] = [];
 
     if (latestWithSellers && latestWithSellers.sellers && latestWithSellers.sellers.length > 0) {
       sellersToUse = latestWithSellers.sellers.map((s, idx) => ({
-        id: `sel-${targetBakeryId}-${dateStr}-${idx}-${Date.now()}`,
+        id: `sel-${dateStr}-${idx}-${Date.now()}`,
         name: s.name,
         phone: s.phone,
         age: s.age,
@@ -252,14 +160,13 @@ export default function App() {
         soldCount: s.soldCount || s.totalGiven || 95,
         returnCount: s.returnCount || 0,
         lostCount: 0,
-        cashCollected: (s.soldCount || s.totalGiven || 95) * sellingPrice,
+        cashCollected: (s.soldCount || s.totalGiven || 95) * settings.defaultSellingPrice,
         notes: '',
       }));
     } else {
       sellersToUse = getInitialSellers();
     }
 
-    // Also ensure all sellers currently registered in settings.defaultSellers are included
     const existingSellerNames = new Set(sellersToUse.map((s) => s.name.trim().toLowerCase()));
     settings.defaultSellers.forEach((item, idx) => {
       const sName = typeof item === 'string' ? item.trim() : item.name.trim();
@@ -269,7 +176,7 @@ export default function App() {
         const age = typeof item === 'object' && item.age ? item.age : 25;
         const role = typeof item === 'object' && item.role ? item.role : 'Vendeur';
         sellersToUse.push({
-          id: `sel-${targetBakeryId}-${dateStr}-def-${idx}-${Date.now()}`,
+          id: `sel-${dateStr}-def-${idx}-${Date.now()}`,
           name: sName,
           phone,
           age,
@@ -286,23 +193,21 @@ export default function App() {
 
     const summary = calculateJournalSummary(
       sellersToUse,
-      sellingPrice,
-      returnPrice,
-      costPrice,
+      settings.defaultSellingPrice,
+      settings.defaultReturnPrice,
+      settings.defaultCostPrice,
       [],
       settings.calculationFormula
     );
 
     return {
-      id: `journal-${targetBakeryId}-${dateStr}`,
+      id: `journal-${dateStr}`,
       date: dateStr,
-      title: `Journal de caisse - ${targetBakeryName}`,
-      bakeryId: targetBakeryId,
-      bakeryName: targetBakeryName,
-      productName: prodName,
-      unitSellingPrice: sellingPrice,
-      unitReturnPrice: returnPrice,
-      unitCostPrice: costPrice,
+      title: 'Journal de caisse',
+      productName: settings.defaultProductName,
+      unitSellingPrice: settings.defaultSellingPrice,
+      unitReturnPrice: settings.defaultReturnPrice,
+      unitCostPrice: settings.defaultCostPrice,
       sellers: sellersToUse,
       expenses: [],
       summary,
@@ -311,123 +216,42 @@ export default function App() {
     };
   };
 
-  // Active Bakery Perimeter and its filtered journals
-  const activeBakery = useMemo(() => {
-    return bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
-  }, [bakeries, activeBakeryId]);
-
-  const isAllBakeries = activeBakeryId === 'all';
-
-  const activeBakeryJournals = useMemo(() => {
-    if (isAllBakeries) return journals;
-    return journals.filter((j) => (j.bakeryId || 'boulangerie-principale') === activeBakeryId);
-  }, [journals, activeBakeryId, isAllBakeries]);
-
   // Initialize or pick the current journal
   const [currentJournal, setCurrentJournal] = useState<DailyJournal>(() => {
     const todayStr = getLocalDateString();
-    const existingToday = journals.find((j) => j.date === todayStr && (j.bakeryId || 'boulangerie-principale') === activeBakeryId);
+    const existingToday = journals.find((j) => j.date === todayStr);
     if (existingToday) return existingToday;
-
-    const anyToday = journals.find((j) => j.date === todayStr);
-    if (anyToday) return anyToday;
-
-    // Create a new daily journal for today so it appears automatically
-    const newToday = createNewJournalForDate(todayStr, journals);
-    return newToday;
+    return createNewJournalForDate(todayStr, journals);
   });
 
-  // Automatically ensure that each day, a new journal appears in Historique des Journaux for active bakery
+  // Automatically ensure today's journal exists
   useEffect(() => {
     if (!liveTodayStr) return;
-    const targetBakery = bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
-    const targetBakeryId = targetBakery?.id || 'boulangerie-principale';
-
-    const hasToday = journals.some((j) => j.date === liveTodayStr && (j.bakeryId || 'boulangerie-principale') === targetBakeryId);
+    const hasToday = journals.some((j) => j.date === liveTodayStr);
     if (!hasToday) {
-      const newToday = createNewJournalForDate(liveTodayStr, journals, targetBakery);
+      const newToday = createNewJournalForDate(liveTodayStr, journals);
       setJournals((prev) => {
-        if (prev.some((j) => j.date === liveTodayStr && (j.bakeryId || 'boulangerie-principale') === targetBakeryId)) return prev;
+        if (prev.some((j) => j.date === liveTodayStr)) return prev;
         return [newToday, ...prev].sort((a, b) => b.date.localeCompare(a.date));
       });
       setCurrentJournal(newToday);
     }
-  }, [liveTodayStr, journals.length, activeBakeryId]);
+  }, [liveTodayStr, journals.length]);
 
-  // Keep localStorage in sync and auto-save monthly profit records every 1 month
+  // Keep localStorage in sync
   useEffect(() => {
     saveJournals(journals);
-    if (journals.length > 0) {
-      autoSaveMonthlyProfitRecords(journals, currentUser?.uid).catch(console.error);
-    }
-  }, [journals, currentUser?.uid]);
+  }, [journals]);
 
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
 
-  // Bakery management handlers
-  const handleSelectBakery = (bakeryId: string) => {
-    setActiveBakeryId(bakeryId);
-    saveActiveBakeryId(bakeryId);
-
-    if (bakeryId !== 'all') {
-      const bJournals = journals.filter((j) => (j.bakeryId || 'boulangerie-principale') === bakeryId);
-      const todayJ = bJournals.find((j) => j.date === liveTodayStr);
-      if (todayJ) {
-        setCurrentJournal(todayJ);
-      } else if (bJournals.length > 0) {
-        setCurrentJournal(bJournals[0]);
-      } else {
-        const targetB = bakeries.find((b) => b.id === bakeryId);
-        const newJ = createNewJournalForDate(liveTodayStr, journals, targetB);
-        setJournals((prev) => [newJ, ...prev].sort((a, b) => b.date.localeCompare(a.date)));
-        setCurrentJournal(newJ);
-      }
-    }
-  };
-
-  const handleAddBakery = (newBakery: BakeryBranch) => {
-    const updatedBakeries = [...bakeries, newBakery];
-    setBakeries(updatedBakeries);
-    saveBakeries(updatedBakeries);
-
-    setActiveBakeryId(newBakery.id);
-    saveActiveBakeryId(newBakery.id);
-
-    // Create a fresh journal for today for this new bakery
-    const todayStr = getLocalDateString();
-    const newJ = createNewJournalForDate(todayStr, journals, newBakery);
-    const updatedJournals = [newJ, ...journals].sort((a, b) => b.date.localeCompare(a.date));
-    setJournals(updatedJournals);
-    saveJournals(updatedJournals);
-    setCurrentJournal(newJ);
-
-    setActivePage('journal');
-    setDashboardTab('editor');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleDeleteBakery = (bakeryId: string) => {
-    if (bakeryId === 'boulangerie-principale') return;
-    const updated = bakeries.filter((b) => b.id !== bakeryId);
-    setBakeries(updated);
-    saveBakeries(updated);
-
-    setActiveBakeryId('boulangerie-principale');
-    saveActiveBakeryId('boulangerie-principale');
-
-    const primaryJournals = journals.filter((j) => (j.bakeryId || 'boulangerie-principale') === 'boulangerie-principale');
-    if (primaryJournals.length > 0) {
-      setCurrentJournal(primaryJournals[0]);
-    }
-  };
-
   // Handle saving a journal: saves and updates Historique des Journaux
   const handleSaveJournal = async (updatedJournal: DailyJournal) => {
     const journalId = updatedJournal.id && updatedJournal.id.includes(updatedJournal.date)
       ? updatedJournal.id
-      : `journal-${updatedJournal.bakeryId || 'boulangerie-principale'}-${updatedJournal.date}`;
+      : `journal-${updatedJournal.date}`;
 
     const finalJournal: DailyJournal = {
       ...updatedJournal,
@@ -436,7 +260,7 @@ export default function App() {
     };
 
     setJournals((prev) => {
-      const existsIndex = prev.findIndex((j) => (j.id === finalJournal.id) || (j.date === finalJournal.date && (j.bakeryId || 'boulangerie-principale') === (finalJournal.bakeryId || 'boulangerie-principale')));
+      const existsIndex = prev.findIndex((j) => j.date === finalJournal.date || j.id === finalJournal.id);
       let next: DailyJournal[];
       if (existsIndex >= 0) {
         next = [...prev];
@@ -448,7 +272,7 @@ export default function App() {
     });
     setCurrentJournal(finalJournal);
 
-    // If logged in, also sync to Cloud (Firestore)
+    // Sync to Cloud if logged in
     if (currentUser) {
       try {
         await saveJournalToCloud(currentUser.uid, finalJournal);
@@ -458,23 +282,19 @@ export default function App() {
     }
   };
 
-  // Handle creating a blank/new journal for today or specific date
+  // Handle creating a blank/new journal for today
   const handleNewJournal = () => {
     const todayStr = getLocalDateString();
-    const targetBakery = bakeries.find((b) => b.id === activeBakeryId) || bakeries[0];
-    const targetBakeryId = targetBakery?.id || 'boulangerie-principale';
-    const newJ = createNewJournalForDate(todayStr, journals, targetBakery);
+    const newJ = createNewJournalForDate(todayStr, journals);
 
     setJournals((prev) => {
-      const exists = prev.find((j) => j.date === todayStr && (j.bakeryId || 'boulangerie-principale') === targetBakeryId);
+      const exists = prev.find((j) => j.date === todayStr);
       if (exists) return prev;
       return [newJ, ...prev].sort((a, b) => b.date.localeCompare(a.date));
     });
 
     setCurrentJournal(newJ);
     setActivePage('journal');
-    setDashboardTab('editor');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteJournal = async (id: string) => {
@@ -517,287 +337,143 @@ export default function App() {
   const handleSelectJournalFromHistory = (journal: DailyJournal) => {
     setCurrentJournal(journal);
     setActivePage('journal');
-    setDashboardTab('editor');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleUpdateSellerInfo = (
-    sellerName: string,
-    updatedInfo: { phone?: string; age?: number | string; role?: string }
-  ) => {
-    // 1. Update matching seller info across all journals
-    setJournals((prevJournals) =>
-      prevJournals.map((j) => ({
-        ...j,
-        sellers: j.sellers.map((s) => {
-          if (s.name.trim().toLowerCase() === sellerName.trim().toLowerCase()) {
-            return {
-              ...s,
-              phone: updatedInfo.phone !== undefined ? updatedInfo.phone : s.phone,
-              age: updatedInfo.age !== undefined ? updatedInfo.age : s.age,
-              role: updatedInfo.role !== undefined ? updatedInfo.role : s.role,
-            };
-          }
-          return s;
-        }),
-      }))
-    );
-
-    // 2. Update current active journal
-    setCurrentJournal((prev) => ({
-      ...prev,
-      sellers: prev.sellers.map((s) => {
-        if (s.name.trim().toLowerCase() === sellerName.trim().toLowerCase()) {
-          return {
-            ...s,
-            phone: updatedInfo.phone !== undefined ? updatedInfo.phone : s.phone,
-            age: updatedInfo.age !== undefined ? updatedInfo.age : s.age,
-            role: updatedInfo.role !== undefined ? updatedInfo.role : s.role,
-          };
-        }
-        return s;
-      }),
-    }));
-
-    // 3. Update settings defaultSellers list
-    setSettings((prevSettings) => {
-      const updatedDefaults = prevSettings.defaultSellers.map((item) => {
-        const name = typeof item === 'string' ? item : item.name;
-        if (name.trim().toLowerCase() === sellerName.trim().toLowerCase()) {
-          if (typeof item === 'string') {
-            return {
-              name,
-              phone: updatedInfo.phone || '+221 77 000 00 00',
-              age: updatedInfo.age || 25,
-              role: updatedInfo.role || 'Vendeur',
-            };
-          }
-          return {
-            ...item,
-            phone: updatedInfo.phone !== undefined ? updatedInfo.phone : item.phone,
-            age: updatedInfo.age !== undefined ? updatedInfo.age : item.age,
-            role: updatedInfo.role !== undefined ? updatedInfo.role : item.role,
-          };
-        }
-        return item;
-      });
-
-      return {
-        ...prevSettings,
-        defaultSellers: updatedDefaults,
-      };
-    });
-  };
-
-  // Handle saving settings and automatically propagate new sellers to current journal and seller accounting
-  const handleSaveSettings = (newSettings: AppSettings) => {
-    setSettings(newSettings);
-
-    // Automatically synchronize new sellers from Identification de l'Équipe into currentJournal
-    setCurrentJournal((prevJournal) => {
-      const existingNames = new Set(prevJournal.sellers.map((s) => s.name.trim().toLowerCase()));
-      const newEntries: SellerEntry[] = [];
-
-      newSettings.defaultSellers.forEach((item, idx) => {
-        const sName = typeof item === 'string' ? item.trim() : item.name.trim();
-        if (sName && !existingNames.has(sName.toLowerCase())) {
-          existingNames.add(sName.toLowerCase());
-          const phone = typeof item === 'object' && item.phone ? item.phone : '+221 77 000 00 00';
-          const age = typeof item === 'object' && item.age ? item.age : 25;
-          const role = typeof item === 'object' && item.role ? item.role : 'Vendeur';
-
-          newEntries.push({
-            id: `sel-auto-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
-            name: sName,
-            phone,
-            age,
-            role,
-            totalGiven: 0,
-            soldCount: 0,
-            returnCount: 0,
-            lostCount: 0,
-            cashCollected: 0,
-            notes: '',
-          });
-        }
-      });
-
-      if (newEntries.length === 0) return prevJournal;
-
-      const updatedSellers = [...prevJournal.sellers, ...newEntries];
-      const updatedSummary = calculateJournalSummary(
-        updatedSellers,
-        prevJournal.unitSellingPrice,
-        prevJournal.unitReturnPrice,
-        prevJournal.unitCostPrice,
-        prevJournal.expenses,
-        newSettings.calculationFormula
-      );
-
-      const updatedJournal: DailyJournal = {
-        ...prevJournal,
-        sellers: updatedSellers,
-        summary: updatedSummary,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Also update in journals list
-      setJournals((prev) => {
-        return prev.map((j) => {
-          if (j.id === updatedJournal.id || j.date === updatedJournal.date) {
-            return updatedJournal;
-          }
-          return j;
-        });
-      });
-
-      if (currentUser) {
-        saveJournalToCloud(currentUser.uid, updatedJournal).catch(console.error);
+  const handleManualCloudSync = async () => {
+    setIsCloudSyncing(true);
+    try {
+      let user = currentUser;
+      if (!user) {
+        user = await ensureAuthUser();
+        if (user) setCurrentUser(user);
       }
-
-      return updatedJournal;
-    });
+      if (user) {
+        await syncAllJournalsToCloud(user.uid, journals);
+      }
+    } catch (err) {
+      console.error('Manual cloud sync failed:', err);
+      throw err;
+    } finally {
+      setIsCloudSyncing(false);
+    }
   };
-
-  const handleResetAllData = () => {
-    localStorage.clear();
-    const loadedS = DEFAULT_SETTINGS;
-    setSettings(loadedS);
-    const initialJ = loadJournals();
-    setJournals(initialJ);
-    setCurrentJournal(initialJ[0]);
-    setActivePage('dashboard');
-    setDashboardTab('editor');
-  };
-
-  const todayGain = currentJournal?.summary?.netGain || 0;
-
-  const isAccessAllowed = subscription?.status === 'active' || (subscription?.status === 'trial' && (subscription?.trialDaysRemaining ?? 0) > 0);
-  const trialDaysRemaining = subscription?.trialDaysRemaining ?? 7;
 
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#1A1A1A] flex flex-col selection:bg-[#2D5A43] selection:text-white">
       
-      {/* Top Main Navigation Header */}
+      {/* Top Header avec navigation et bouton Compte Google */}
       <Header
         activePage={activePage}
         setActivePage={setActivePage}
         settings={settings}
         onNewJournal={handleNewJournal}
-        todayGain={todayGain}
-        user={currentUser}
         journals={journals}
-        onJournalsLoadedFromCloud={(cloudJournals) => {
-          setJournals(cloudJournals);
-          if (cloudJournals.length > 0) {
-            setCurrentJournal(cloudJournals[0]);
-          }
-        }}
-        isPremium={isAccessAllowed}
-        onOpenSubscribeModal={() => setIsSubscribeModalOpen(true)}
-        phoneAccount={phoneAccount}
-        subscription={subscription}
-        onOpenPhoneAuthModal={handleOpenPhoneAuthModal}
-        onLogoutPhoneAccount={handleLogoutPhoneAccount}
-        bakeries={bakeries}
-        activeBakeryId={activeBakeryId}
-        onSelectBakery={handleSelectBakery}
-        onOpenAddBakeryModal={() => setIsAddBakeryModalOpen(true)}
-        onSelectJournal={handleSelectJournalFromHistory}
-        onDeleteBakery={handleDeleteBakery}
+        currentUser={currentUser}
+        onSyncCloud={handleManualCloudSync}
+        isCloudSyncing={isCloudSyncing}
+        onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
+        onOpenInstallModal={() => setIsInstallModalOpen(true)}
+        onOpenMultiAppModal={() => setIsMultiAppModalOpen(true)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-
-        {/* Payment notification banner */}
-        {paymentBanner && (
-          <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-xs animate-fadeIn ${
-            paymentBanner.type === 'success'
-              ? 'bg-[#E7EFEA] border-[#2D5A43] text-[#2D5A43]'
-              : 'bg-[#FAF0F0] border-[#8B3A3A] text-[#8B3A3A]'
-          }`}>
-            <div className="flex items-center space-x-3 text-xs sm:text-sm font-semibold">
-              {paymentBanner.type === 'success' ? (
-                <CheckCircle2 className="w-5 h-5 shrink-0 text-[#2D5A43]" />
-              ) : (
-                <AlertCircle className="w-5 h-5 shrink-0 text-[#8B3A3A]" />
-              )}
-              <span>{paymentBanner.message}</span>
+      {/* Bannière d'invitation à la connexion Compte Google */}
+      {(!currentUser || currentUser.isAnonymous) && !dismissGoogleBanner && (
+        <div className="bg-[#E7EFEA] border-b border-[#C3D9CD] px-4 py-2.5 sm:py-3 transition-all animate-fadeIn">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-2.5 text-[#1B3628]">
+              <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 shadow-2xs border border-[#C3D9CD]">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                </svg>
+              </div>
+              <p className="leading-snug">
+                <strong className="font-bold">Sauvegardez vos journaux sur votre compte Google :</strong> connectez-vous pour conserver vos données de caisse et synchroniser vos ventes en temps réel.
+              </p>
             </div>
-            <div className="flex items-center space-x-2 shrink-0">
+
+            <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
               <button
                 type="button"
-                onClick={() => {
-                  setActivePage('subscription');
-                  setPaymentBanner(null);
-                }}
-                className="px-3 py-1 bg-white rounded-lg text-xs font-bold border border-current shadow-xs cursor-pointer hover:opacity-80"
+                id="btn-banner-google-login"
+                onClick={() => setIsGoogleModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#2D5A43] hover:bg-[#234735] text-white font-bold rounded-xl shadow-xs transition-transform active:scale-95 cursor-pointer"
               >
-                Voir mon abonnement
+                <span>Ajouter mon compte Google</span>
               </button>
               <button
                 type="button"
-                onClick={() => setPaymentBanner(null)}
-                className="p-1 rounded-lg hover:bg-black/10 text-current cursor-pointer"
-                title="Fermer"
+                onClick={() => {
+                  setDismissGoogleBanner(true);
+                  localStorage.setItem('dismiss_google_sync_banner', 'true');
+                }}
+                className="p-1.5 text-[#5C574F] hover:text-[#1A1A1A] rounded-lg transition-colors cursor-pointer"
+                title="Masquer cette bannière"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Main Content Area (extra bottom padding on mobile for Android navigation bar) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 pb-28 md:pb-12 space-y-6">
         
-        {/* PAGE 1: JOURNAL DE CAISSE (SAISIE QUOTIDIENNE & HISTORIQUE) */}
+        {/* VUE 1 : COMPTABILITÉ DES VENDEURS / LIVREURS */}
         {(activePage === 'journal' || activePage === 'dashboard') && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Quick Banner Linking to Gains & Synthèse de Caisse Page */}
-            <div className="bg-[#2D5A43] text-white p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 rounded-xl bg-white/15 text-[#D8EADB]">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base font-editorial">
-                    Calcul des Gains & Synthèse Journalière de Caisse
-                  </h3>
-                  <p className="text-xs text-[#D8EADB]/90 font-editorial">
-                    Bénéfices calculés sur Aujourd'hui, Tous les Jours, 1 Mois, 1 An avec analyse complète des retours.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                id="btn-goto-gains-summary"
-                onClick={() => setActivePage('gains_summary')}
-                className="bg-white text-[#2D5A43] hover:bg-[#F4F1EA] px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
-              >
-                Voir Gains & Synthèse Caisse →
-              </button>
-            </div>
-
-            {/* SAISIE DU JOURNAL DE CAISSE DU JOUR */}
-            <section id="section-saisie-journal" className="space-y-4">
+            <section id="section-comptabilite-vendeurs" className="space-y-4">
               <DailyJournalEditor
                 currentJournal={currentJournal}
                 settings={settings}
-                journals={activeBakeryJournals}
+                journals={journals}
                 onSelectJournal={handleSelectJournalFromHistory}
                 onSaveJournal={handleSaveJournal}
                 onPrintJournal={(j) => setActivePrintJournal(j)}
                 onNewJournal={handleNewJournal}
-                onUpdateSettings={handleSaveSettings}
+                onNavigateToSynthesis={() => {
+                  setActivePage('gains_summary');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onNavigateToSettings={() => {
+                  setActivePage('settings');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               />
             </section>
           </div>
         )}
 
-        {/* PAGE HISTORIQUE DÉDIÉE */}
+        {/* VUE 2 : SYNTHÈSE JOURNALIÈRE DE CAISSE & CALCUL DES GAINS */}
+        {(activePage === 'gains_summary' || (activePage as string) === 'synthesis') && (
+          <GainsAndSummaryPage
+            journals={journals}
+            currentJournal={currentJournal}
+            settings={settings}
+            selectedPeriod={selectedPeriod}
+            currentUserId={currentUser?.uid}
+            onSelectPeriod={setSelectedPeriod}
+            onSelectJournal={(j) => {
+              setCurrentJournal(j);
+              setActivePage('journal');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            bakeries={bakeries}
+            activeBakeryId={activeBakeryId}
+            onSelectBakery={setActiveBakeryId}
+          />
+        )}
+
+        {/* VUE 3 : HISTORIQUE DES JOURNAUX */}
         {activePage === 'history' && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Full Journal History List with Multi-Select & Search */}
+            {/* Liste de l'Historique avec recherche et suppression */}
             <JournalHistoryList
-              journals={activeBakeryJournals}
+              journals={journals}
               currency={settings.currency}
               activeJournalId={currentJournal.id}
               onSelectJournal={handleSelectJournalFromHistory}
@@ -805,6 +481,13 @@ export default function App() {
               onDeleteMultipleJournals={handleDeleteMultipleJournals}
               onPrintJournal={(j) => setActivePrintJournal(j)}
               onSaveJournal={handleSaveJournal}
+              onSyncCloud={handleManualCloudSync}
+              isCloudSyncing={isCloudSyncing}
+              onViewSynthesis={(j) => {
+                setCurrentJournal(j);
+                setActivePage('synthesis');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onBackToEditor={() => {
                 setActivePage('journal');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -813,74 +496,78 @@ export default function App() {
           </div>
         )}
 
-        {/* PAGE 2: NOUVELLE PAGE DÉDIÉE - CALCUL DES GAINS & BÉNÉFICES & SYNTHÈSE DE CAISSE */}
-        {activePage === 'gains_summary' && (
-          <GainsAndSummaryPage
-            journals={journals}
-            currentJournal={currentJournal}
-            settings={settings}
-            selectedPeriod={selectedPeriod}
-            currentUserId={currentUser?.uid}
-            onSelectPeriod={setSelectedPeriod}
-            onUpdateSellerInfo={handleUpdateSellerInfo}
-            bakeries={bakeries}
-            activeBakeryId={activeBakeryId}
-            onSelectBakery={handleSelectBakery}
-            onSelectJournal={(j) => {
-              setCurrentJournal(j);
-              setActivePage('journal');
-            }}
-          />
-        )}
-
-        {/* PAGE 3: PARAMÈTRES DE LA BOULANGERIE */}
+        {/* VUE 4 : PARAMÈTRES */}
         {activePage === 'settings' && (
-          <div className="animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn">
             <SettingsPage
               settings={settings}
-              onSaveSettings={handleSaveSettings}
+              onSaveSettings={(newSettings) => {
+                setSettings(newSettings);
+                saveSettings(newSettings);
+              }}
               journals={journals}
               onImportJournals={(imported) => {
                 setJournals(imported);
-                if (imported.length > 0) setCurrentJournal(imported[0]);
+                saveJournals(imported);
               }}
-              onResetAllData={handleResetAllData}
-            />
-          </div>
-        )}
-
-        {/* PAGE 4: MON ABONNEMENT (OFFRE PREMIUM 5 000 FCFA - WAVE & ORANGE MONEY) */}
-        {activePage === 'subscription' && (
-          <div className="animate-fadeIn">
-            <SubscriptionPage
-              user={currentUser}
-              subscription={subscription}
-              transactions={transactions}
-              paymentConfig={paymentConfig}
-              onOpenSubscribeModal={() => setIsSubscribeModalOpen(true)}
-              onRefresh={loadSubscriptionData}
-              phoneAccount={phoneAccount}
-              onOpenPhoneAuthModal={handleOpenPhoneAuthModal}
-              onLogoutPhoneAccount={handleLogoutPhoneAccount}
+              onResetAllData={() => {
+                const def = { ...settings };
+                setSettings(def);
+                saveSettings(def);
+              }}
+              currentJournal={currentJournal}
+              onUpdateCurrentJournal={handleSaveJournal}
+              onSelectJournal={handleSelectJournalFromHistory}
+              onNavigateToJournal={() => {
+                setActivePage('journal');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenMultiAppModal={() => setIsMultiAppModalOpen(true)}
             />
           </div>
         )}
 
       </main>
 
-      {/* Footer */}
+      {/* Footer simple et sobre */}
       <footer className="border-t border-[#DCD6CB] bg-[#FAFAF7] py-6 text-center text-xs text-[#7A756D] print:hidden">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="font-medium text-[#4A463F] font-editorial text-sm">
-            {settings.businessName} — Gestion commerciale, Journal de caisse & Calcul des bénéfices
+            {settings.businessName} — Comptabilité des Vendeurs / Livreurs & Historique des Journaux
           </p>
-          <p className="text-[#8C877E]">
-            Calculs automatiques Aujourd'hui, Tous les Jours, 1 Mois et 1 An • Paiements Wave & Orange Money certifiés
-          </p>
+          <div className="flex items-center space-x-4 text-[#8C877E]">
+            <button
+              onClick={() => setActivePage('journal')}
+              className={`hover:underline cursor-pointer ${activePage === 'journal' ? 'font-bold text-[#2D5A43]' : ''}`}
+            >
+              Comptabilité Vendeurs
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => setActivePage('synthesis')}
+              className={`hover:underline cursor-pointer ${activePage === 'synthesis' || activePage === 'gains_summary' ? 'font-bold text-[#2D5A43]' : ''}`}
+            >
+              Synthèse Caisse
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => setActivePage('history')}
+              className={`hover:underline cursor-pointer ${activePage === 'history' ? 'font-bold text-[#2D5A43]' : ''}`}
+            >
+              Historique ({journals.length})
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => setActivePage('settings')}
+              className={`hover:underline cursor-pointer ${activePage === 'settings' ? 'font-bold text-[#2D5A43]' : ''}`}
+            >
+              Paramètres
+            </button>
+          </div>
         </div>
       </footer>
 
-      {/* Printable Receipt Modal */}
+      {/* Reçu imprimable lors du clic sur Imprimer / Ticket */}
       {activePrintJournal && (
         <ReceiptModal
           journal={activePrintJournal}
@@ -889,35 +576,40 @@ export default function App() {
         />
       )}
 
-      {/* Subscription Modal for Wave & Orange Money */}
-      <SubscriptionModal
-        isOpen={isSubscribeModalOpen}
-        onClose={() => setIsSubscribeModalOpen(false)}
-        user={currentUser}
-        subscription={subscription}
-        paymentConfig={paymentConfig}
-        onSubscriptionUpdated={() => {
-          loadSubscriptionData();
-        }}
-      />
-
-      {/* Phone Account Authentication Modal (7-day free trial on registration) */}
-      <PhoneAuthModal
-        isOpen={isPhoneAuthModalOpen}
-        onClose={() => setIsPhoneAuthModalOpen(false)}
-        initialMode={phoneAuthInitialMode}
-        onSuccess={handlePhoneAuthSuccess}
-      />
-
-      {/* Modal: Ajouter une nouvelle boulangerie & Périmètre */}
+      {/* Boîte de dialogue d'ajout d'une nouvelle boulangerie */}
       <AddBakeryModal
         isOpen={isAddBakeryModalOpen}
         onClose={() => setIsAddBakeryModalOpen(false)}
-        onAddBakery={handleAddBakery}
+        onAddBakery={(newBak) => {
+          const updated = [...bakeries, newBak];
+          setBakeries(updated);
+          saveBakeries(updated);
+          setActiveBakeryId(newBak.id);
+          saveActiveBakeryId(newBak.id);
+        }}
         currency={settings.currency}
         defaultSellingPrice={settings.defaultSellingPrice}
         defaultReturnPrice={settings.defaultReturnPrice}
         defaultCostPrice={settings.defaultCostPrice}
+      />
+
+      {/* Boîte de dialogue de Synchronisation Multi-Applications (GitHub Pages & Cloud Run) */}
+      <FirebaseMultiAppSyncModal
+        isOpen={isMultiAppModalOpen}
+        onClose={() => setIsMultiAppModalOpen(false)}
+        currentUser={currentUser}
+        journals={journals}
+        onForceSyncAll={handleManualCloudSync}
+        isCloudSyncing={isCloudSyncing}
+      />
+
+      {/* Barre de navigation mobile style Android M3 */}
+      <AndroidBottomNav
+        activePage={activePage}
+        setActivePage={setActivePage}
+        journalsCount={journals.length}
+        onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
+        isGoogleConnected={Boolean(currentUser && !currentUser.isAnonymous && currentUser.email)}
       />
 
     </div>

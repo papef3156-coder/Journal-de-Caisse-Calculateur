@@ -34,10 +34,12 @@ import {
   FolderDown,
   Download,
   FileText,
+  Calculator,
   Mail,
   MessageSquare,
   Send,
-  Smartphone
+  Smartphone,
+  Settings
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -63,6 +65,8 @@ interface DailyJournalEditorProps {
   onUpdateSettings?: (settings: AppSettings) => void;
   journals?: DailyJournal[];
   onSelectJournal?: (journal: DailyJournal) => void;
+  onNavigateToSynthesis?: () => void;
+  onNavigateToSettings?: () => void;
 }
 
 export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
@@ -74,6 +78,8 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
   onUpdateSettings,
   journals = [],
   onSelectJournal,
+  onNavigateToSynthesis,
+  onNavigateToSettings,
 }) => {
   const { todayStr: liveTodayStr, timeStr: liveTimeStr } = useLiveDateTime();
   const [date, setDate] = useState(currentJournal.date || getLocalDateString());
@@ -314,6 +320,22 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   };
 
+  const handleSellingPriceChange = (val: number) => {
+    const newPrice = Math.max(0, val);
+    setUnitSellingPrice(newPrice);
+    setSellers((prev) =>
+      prev.map((s) => ({
+        ...s,
+        cashCollected: (Number(s.soldCount) || 0) * newPrice,
+      }))
+    );
+  };
+
+  const handleReturnPriceChange = (val: number) => {
+    const newPrice = Math.max(0, val);
+    setUnitReturnPrice(newPrice);
+  };
+
   // Date change handler: if an archived journal already exists for this date, switch to it
   const handleDateChange = (newDate: string) => {
     setDate(newDate);
@@ -491,36 +513,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
             <h3 className="font-bold text-base font-editorial text-[#F4F1EA] tracking-wide">
               Synthèse Journalière de Caisse
             </h3>
-            {currentJournal.bakeryName && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#2D5A43] text-[#E7EFEA] border border-[#3D7A5C] font-semibold">
-                🥖 {currentJournal.bakeryName}
-              </span>
-            )}
-          </div>
-
-          {/* Quick Messaging Actions (Gmail Google, Messages SMS, Options) */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              id="btn-synthesis-gmail-header"
-              type="button"
-              onClick={handleOpenGmailDirect}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#EA4335] hover:bg-[#D93025] text-white shadow-xs transition-all cursor-pointer"
-              title={`Ouvrir dans Gmail (${settings.notificationEmail || 'papef4261@gmail.com'}) avec la synthèse rédigée`}
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Gmail (Google)</span>
-            </button>
-
-            <button
-              id="btn-synthesis-options-header"
-              type="button"
-              onClick={() => setShowSendModal(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#3D9970] hover:bg-[#2E7A58] text-white shadow-xs transition-all cursor-pointer"
-              title="Toutes les options d'envoi (WhatsApp, modification destinataire, etc.)"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Envoyer...</span>
-            </button>
           </div>
         </div>
 
@@ -616,17 +608,11 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#EBE8E0]">
           
           <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-[#1A1A1A] text-[#F4F1EA] uppercase tracking-wider font-mono-num">
-                Journal de Caisse
-              </span>
-              <span className="text-xs text-[#7A756D] font-medium font-editorial italic">
-                Saisie & Calculs en temps réel
-              </span>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-2xl sm:text-3xl font-bold font-editorial text-[#1A1A1A] tracking-tight">
+                {formatDateFrench(date)}
+              </h2>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold font-editorial text-[#1A1A1A] tracking-tight">
-              {formatDateFrench(date)}
-            </h2>
           </div>
 
           {/* Action Buttons */}
@@ -647,49 +633,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                   <span>Enregistrer et ajouter à l'Historique</span>
                 </>
               )}
-            </button>
-
-            <button
-              id="btn-save-pc"
-              type="button"
-              onClick={handleManualSaveToPc}
-              title="Générer et sauvegarder la fiche journal au format Word (.docx) sur votre ordinateur"
-              className="flex items-center space-x-1.5 bg-[#EAEFF8] hover:bg-[#D7E3F4] text-[#1E3A8A] px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-colors border border-[#BFDBFE] cursor-pointer shadow-2xs"
-            >
-              <FileText className="w-4 h-4 text-[#2563EB]" />
-              <span>Word (.docx)</span>
-            </button>
-
-            <button
-              id="btn-send-synthesis-actionbar"
-              type="button"
-              onClick={() => setShowSendModal(true)}
-              title="Envoyer la synthèse journalière par Gmail ou Messages (SMS)"
-              className="flex items-center space-x-1.5 bg-[#FDF2F2] hover:bg-[#FCE8E6] text-[#C5221F] px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-colors border border-[#F5C2C2] cursor-pointer shadow-2xs"
-            >
-              <Send className="w-4 h-4 text-[#EA4335]" />
-              <span>Envoyer Synthèse</span>
-            </button>
-
-            <button
-              id="btn-print-receipt"
-              onClick={() => onPrintJournal({
-                ...currentJournal,
-                date,
-                productName,
-                unitSellingPrice,
-                unitReturnPrice,
-                unitCostPrice,
-                sellers,
-                expenses,
-                summary,
-                notes,
-                updatedAt: new Date().toISOString(),
-              })}
-              className="flex items-center space-x-2 bg-[#EBE8E0] hover:bg-[#DCD6CB] text-[#1A1A1A] px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-colors border border-[#DCD6CB] cursor-pointer"
-            >
-              <Printer className="w-4 h-4 text-[#5C574F]" />
-              <span>Imprimer / Ticket</span>
             </button>
           </div>
         </div>
@@ -726,78 +669,6 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
             <button onClick={() => setAutoSentNotice(null)} className="text-xs opacity-60 hover:opacity-100">✕</button>
           </div>
         )}
-
-        {/* Configurations rapides du jour (Date) */}
-        <div className="pt-4 border-t border-[#EBE8E0]">
-          {/* Colonne Date */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-[#4A463F] flex items-center gap-1.5 font-editorial">
-                <Calendar className="w-3.5 h-3.5 text-[#2D5A43]" />
-                <span>Date du journal</span>
-              </label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                id="input-journal-date"
-                type="date"
-                value={date}
-                onChange={(e) => handleDateChange(e.target.value)}
-                className="flex-1 bg-[#F4F1EA] border border-[#DCD6CB] rounded-lg px-3 py-1.5 text-[#1A1A1A] font-semibold font-mono-num focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D5A43]"
-              />
-
-              {/* Quick shortcut to live today's date */}
-              <button
-                id="btn-set-today-date"
-                type="button"
-                onClick={() => handleDateChange(liveTodayStr)}
-                title="Mettre à jour sur la date actuelle du jour"
-                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer shrink-0 ${
-                  date === liveTodayStr
-                    ? 'bg-[#2D5A43] text-white border-[#2D5A43] shadow-xs'
-                    : 'bg-[#EBE8E0] text-[#3D3A34] hover:bg-[#DCD6CB] border-[#DCD6CB]'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Aujourd'hui (Auto)</span>
-              </button>
-            </div>
-
-            {/* Quick date chips */}
-            <div className="flex items-center gap-1.5 flex-wrap text-xs">
-              <span className="text-[11px] text-[#7A756D] font-editorial">Raccourcis :</span>
-              <button
-                type="button"
-                id="btn-quick-yesterday"
-                onClick={() => handleDateChange(getOffsetDateString(-1))}
-                className="px-2 py-0.5 rounded-md bg-[#EBE8E0] hover:bg-[#DCD6CB] text-[#4A463F] text-[11px] font-medium border border-[#DCD6CB] transition-colors cursor-pointer"
-              >
-                Hier
-              </button>
-              <button
-                type="button"
-                id="btn-quick-today"
-                onClick={() => handleDateChange(liveTodayStr)}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors cursor-pointer ${
-                  date === liveTodayStr
-                    ? 'bg-[#E7EFEA] text-[#2D5A43] border-[#C3D9CD]'
-                    : 'bg-[#FAFAF7] hover:bg-[#EBE8E0] text-[#2D5A43] border-[#DCD6CB]'
-                }`}
-              >
-                Aujourd'hui
-              </button>
-              <button
-                type="button"
-                id="btn-quick-tomorrow"
-                onClick={() => handleDateChange(getOffsetDateString(1))}
-                className="px-2 py-0.5 rounded-md bg-[#EBE8E0] hover:bg-[#DCD6CB] text-[#4A463F] text-[11px] font-medium border border-[#DCD6CB] transition-colors cursor-pointer"
-              >
-                Demain
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* 3. SELLERS ACCOUNTING TABLE (TABLEAU COMPTABILITÉ DU CAHIER) */}
@@ -870,8 +741,143 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
           </div>
         </div>
 
-        {/* Responsive Table */}
-        <div className="overflow-x-auto">
+        {/* VUE MOBILE ANDROID (sm:hidden) : Cartes tactiles ergonomiques par vendeur */}
+        <div className="block sm:hidden p-3 space-y-3 bg-[#F4F1EA]/60">
+          {sellers.map((seller, index) => {
+            const sold = Number(seller.soldCount) || 0;
+            const lineRevenue = sold * unitSellingPrice;
+
+            return (
+              <div 
+                key={seller.id}
+                className="bg-white rounded-2xl border border-[#DCD6CB] p-3.5 space-y-2.5 shadow-2xs"
+              >
+                {/* En-tête de la carte vendeur */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-6 h-6 rounded-full bg-[#2D5A43]/10 text-[#2D5A43] text-xs flex items-center justify-center font-bold font-mono-num shrink-0">
+                      {index + 1}
+                    </span>
+                    <span className="font-bold text-[#1A1A1A] text-sm truncate max-w-[200px]">
+                      {seller.name}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSeller(seller.id)}
+                    disabled={sellers.length <= 1}
+                    title="Supprimer ce vendeur"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center text-[#8C877E] hover:text-[#8B3A3A] disabled:opacity-20 active:scale-95 transition-transform"
+                  >
+                    <Trash2 className="w-4 h-4 text-[#8B3A3A]" />
+                  </button>
+                </div>
+
+                {/* 3 Blocs de saisie adaptés au toucher sur écran mobile */}
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Confié */}
+                  <div className="bg-[#F4F1EA] p-2 rounded-xl border border-[#DCD6CB] text-center">
+                    <label className="text-[10px] font-bold text-[#5C574F] uppercase tracking-wider block mb-1">
+                      Confié
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min="0"
+                      value={seller.totalGiven}
+                      onChange={(e) => handleSellerChange(seller.id, 'totalGiven', Number(e.target.value) || 0)}
+                      className="w-full text-center font-bold text-base text-[#1A1A1A] font-mono-num bg-transparent focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Vente */}
+                  <div className="bg-[#E7EFEA] p-2 rounded-xl border border-[#C3D9CD] text-center">
+                    <label className="text-[10px] font-bold text-[#2D5A43] uppercase tracking-wider block mb-1">
+                      Vente {sellerAutoCalcMode === 'sold_from_return' ? 'Auto' : ''}
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min="0"
+                      value={seller.soldCount}
+                      onChange={(e) => handleSellerChange(seller.id, 'soldCount', Number(e.target.value) || 0)}
+                      className="w-full text-center font-bold text-base text-[#2D5A43] font-mono-num bg-transparent focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Retour */}
+                  <div className="bg-[#FAF3E8] p-2 rounded-xl border border-[#E8D9C0] text-center">
+                    <label className="text-[10px] font-bold text-[#9C6B28] uppercase tracking-wider block mb-1">
+                      Retour {sellerAutoCalcMode === 'return_from_sold' ? 'Auto' : ''}
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min="0"
+                      value={seller.returnCount}
+                      onChange={(e) => handleSellerChange(seller.id, 'returnCount', Number(e.target.value) || 0)}
+                      className="w-full text-center font-bold text-base text-[#9C6B28] font-mono-num bg-transparent focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Ligne Recette Encaissée */}
+                <div className="flex items-center justify-between pt-1 border-t border-[#F4F1EA] text-xs">
+                  <span className="text-[11px] text-[#7A756D]">
+                    {sold} × {unitSellingPrice} {settings.currency}
+                  </span>
+                  <div className="text-right">
+                    <span className="text-[10px] text-[#7A756D] mr-1.5 font-medium">Recette :</span>
+                    <strong className="text-sm font-bold text-[#2D5A43] font-mono-num">
+                      {formatCurrency(lineRevenue, settings.currency)}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Carte récapitulative Total Mobile */}
+          <div className="bg-[#2D5A43] text-white rounded-2xl p-4 shadow-xs space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-[#D8EADB]">
+              <span>TOTAL DU JOUR</span>
+              <span>{sellers.length} vendeurs</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-white/20">
+              <div>
+                <span className="text-[10px] text-[#D8EADB] block uppercase">Confié</span>
+                <strong className="text-sm font-bold font-mono-num text-white">
+                  {formatNumber(summary.totalProducedOrGiven)}
+                </strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#D8EADB] block uppercase">Vendu</span>
+                <strong className="text-sm font-bold font-mono-num text-[#93E6B8]">
+                  {formatNumber(summary.totalSold)}
+                </strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#D8EADB] block uppercase">Retours</span>
+                <strong className="text-sm font-bold font-mono-num text-[#F9D093]">
+                  {formatNumber(summary.totalReturned)}
+                </strong>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-white/20 flex items-center justify-between">
+              <span className="text-xs text-[#D8EADB]">Recette Vente Totale :</span>
+              <span className="text-base font-bold font-mono-num text-white">
+                {formatCurrency(summary.grossRevenue, settings.currency)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* VUE TABLEAU TABLETTE & ORDINATEUR (hidden sm:block) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-sm" id="table-sellers-accounting">
             <thead className="bg-[#EBE8E0] text-[#4A463F] font-bold text-xs uppercase tracking-wider border-b border-[#DCD6CB]">
               <tr>
@@ -883,7 +889,9 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                 <th className="py-3 px-3 text-center text-[#9C6B28] font-editorial">
                   Retour {sellerAutoCalcMode === 'return_from_sold' ? '(Confié - Vente)' : ''}
                 </th>
-                <th className="py-3 px-4 text-right font-editorial">Prix Vente</th>
+                <th className="py-3 px-4 text-right font-editorial">
+                  Prix Vente & Recette
+                </th>
                 <th className="py-3 px-2 text-center w-10"></th>
               </tr>
             </thead>
@@ -947,9 +955,14 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
                       />
                     </td>
 
-                    {/* Recette Encaissée */}
-                    <td className="py-2.5 px-4 text-right font-bold text-[#1A1A1A] font-mono-num">
-                      {formatCurrency(lineRevenue, settings.currency)}
+                    {/* Prix Vente & Recette */}
+                    <td className="py-2.5 px-4 text-right font-mono-num">
+                      <div className="font-bold text-[#1A1A1A] text-sm">
+                        {formatCurrency(lineRevenue, settings.currency)}
+                      </div>
+                      <div className="text-[10px] text-[#7A756D]">
+                        {sold} × {unitSellingPrice} {settings.currency}
+                      </div>
                     </td>
 
                     {/* Delete row */}
@@ -1003,11 +1016,11 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
 
       </div>
 
-      {/* 4. DÉPENSES & CHARGES DU JOUR & NOTES / OBSERVATIONS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 4. DÉPENSES & CHARGES DU JOUR */}
+      <div className="w-full">
         
         {/* Dépenses / Frais du jour */}
-        <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-4 sm:p-5 shadow-xs space-y-3" id="section-daily-expenses">
+        <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-4 sm:p-5 shadow-xs space-y-3 w-full min-h-[198px]" id="section-daily-expenses">
           <div className="flex items-center justify-between pb-2 border-b border-[#EBE8E0]">
             <div className="flex items-center space-x-2">
               <Receipt className="w-4 h-4 text-[#8B3A3A]" />
@@ -1083,32 +1096,7 @@ export const DailyJournalEditor: React.FC<DailyJournalEditorProps> = ({
           )}
         </div>
 
-        {/* Notes & Observations du jour */}
-        <div className="bg-[#FAFAF7] rounded-2xl border border-[#DCD6CB] p-4 sm:p-5 shadow-xs space-y-3" id="section-daily-notes">
-          <div className="flex items-center justify-between pb-2 border-b border-[#EBE8E0]">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-4 h-4 text-[#2D5A43]" />
-              <h4 className="font-bold text-[#1A1A1A] font-editorial text-sm sm:text-base">
-                Notes & Observations du Jour
-              </h4>
-            </div>
-            <span className="text-[10px] text-[#7A756D] font-editorial italic">
-              Sauvegardées avec le journal
-            </span>
-          </div>
 
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            placeholder="Ex : Pluie le matin ayant ralenti les ventes, commande spéciale école livrée par Moussa, panne de four résolue à 10h..."
-            className="w-full bg-[#F4F1EA] border border-[#DCD6CB] rounded-xl p-3 text-xs text-[#1A1A1A] font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D5A43] resize-none"
-          />
-
-          <div className="flex items-center justify-between text-[11px] text-[#7A756D] font-editorial">
-            <span>Ces remarques figureront dans l'historique et sur les impressions.</span>
-          </div>
-        </div>
 
       </div>
 
